@@ -1,0 +1,41 @@
+#### Swiftmiko itself
+
+Name           License
+-------------  -------------
+Swiftmiko      MIT License
+
+Swiftmiko has no Python runtime dependency of any kind — it is a
+from-scratch Swift reimplementation, not a wrapper around Netmiko.
+The dependencies below are the actual Swift Package Manager
+dependencies declared in Package.swift, plus their own transitive
+dependencies (see Package.resolved for pinned versions).
+
+##### Direct dependencies (declared in Package.swift)
+
+Name                 License              Notes
+-------------------  -------------------  -----
+swift-nio             Apache License 2.0   Transport (TCP/channel pipeline)
+swift-nio-ssh         Apache License 2.0   SSH protocol; local fork at Sources/swift-nio-ssh
+                                            adding classic Diffie-Hellman group14-sha1 key
+                                            exchange for older SSH servers
+swift-log             Apache License 2.0   Logging protocol (Logging product)
+swift-argument-parser Apache License 2.0   CLI tools (SwiftmikoCLI target)
+Yams                  MIT License          .swiftmiko.yml parsing (SwiftmikoCLI target)
+
+##### Transitive dependencies (pulled in by the above)
+
+Name                 License              Pulled in by
+-------------------  -------------------  ------------
+swift-crypto          Apache License 2.0   swift-nio-ssh (host key / KEX / AES-GCM)
+swift-asn1            Apache License 2.0   swift-crypto
+swift-atomics         Apache License 2.0   swift-nio, swift-nio-ssh
+swift-collections     Apache License 2.0   swift-nio
+swift-system          Apache License 2.0   swift-nio
+
+##### System frameworks (no separate license — part of the Apple SDK)
+
+Name                 Notes
+-------------------  -----
+CommonCrypto          AES-CBC fallback for legacy ciphers, via the
+                      Sources/CCommonCryptoShim system-library shim
+                      (see ENCRYPTION_HANDLING.md, COMMON_ISSUES.md)

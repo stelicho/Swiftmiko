@@ -1,0 +1,47 @@
+name: Main
+
+permissions:
+    contents: read
+
+on:
+    push:
+        branches: [main]
+    schedule:
+        - cron: "0 8,20 * * *"
+
+jobs:
+    unit-tests:
+        name: Unit tests
+        uses: apple/swift-nio/.github/workflows/unit_tests.yml@main
+        with:
+            linux_5_10_arguments_override: "--explicit-target-dependency-import-check error"
+            linux_6_1_arguments_override: "--explicit-target-dependency-import-check error -Xswiftc -warnings-as-errors"
+            linux_6_2_arguments_override: "--explicit-target-dependency-import-check error -Xswiftc -warnings-as-errors"
+            linux_6_3_arguments_override: "--explicit-target-dependency-import-check error -Xswiftc -warnings-as-errors"
+            linux_nightly_next_arguments_override: "--explicit-target-dependency-import-check error"
+            linux_nightly_main_arguments_override: "--explicit-target-dependency-import-check error"
+
+    benchmarks:
+        name: Benchmarks
+        uses: apple/swift-nio/.github/workflows/benchmarks.yml@main
+        with:
+            benchmark_package_path: "Benchmarks"
+
+    static-sdk:
+        name: Static SDK
+        # Workaround https://github.com/nektos/act/issues/1875
+        uses: apple/swift-nio/.github/workflows/static_sdk.yml@main
+
+    macos-tests:
+        name: macOS tests
+        uses: apple/swift-nio/.github/workflows/macos_tests.yml@main
+        with:
+            runner_pool: nightly
+            build_scheme: swift-nio-ssh-Package
+            swift_6_1_build_arguments_override: "-Xswiftc -Xfrontend -Xswiftc -require-explicit-sendable"
+            swift_6_2_build_arguments_override: "-Xswiftc -Xfrontend -Xswiftc -require-explicit-sendable"
+            swift_6_3_build_arguments_override: "-Xswiftc -Xfrontend -Xswiftc -require-explicit-sendable"
+
+    release-builds:
+        name: Release builds
+        uses: apple/swift-nio/.github/workflows/release_builds.yml@main
