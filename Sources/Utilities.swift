@@ -113,7 +113,7 @@ public func findConfigFile(_ fileName: String? = nil) throws -> String {
         return environmentPath
     }
 
-    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let home = NSHomeDirectory()
     let searchPaths = [".", home]
     for directory in searchPaths {
         for name in [".swiftmiko.yml", "swiftmiko.yml"] {
@@ -336,7 +336,7 @@ public func getTemplateDirectory(
         // We intentionally do not guess a package location here.
     }
 
-    let fallback = "\(FileManager.default.homeDirectoryForCurrentUser.path)/ntc-templates/ntc_templates/templates"
+    let fallback = "\(NSHomeDirectory())/ntc-templates/ntc_templates/templates"
     guard FileManager.default.fileExists(atPath: "\(fallback)/index") else {
         throw SwiftmikoUtilityError.invalidValue(
             "Directory containing the TextFSM index file was not found. Set NET_TEXTFSM."

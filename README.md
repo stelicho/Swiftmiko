@@ -88,6 +88,12 @@ runner, and an Open vSwitch topology browser. Each is its own Xcode
 target; open `Swiftmiko.xcworkspace` (or the project directly) and
 switch schemes to try one.
 
+[`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
+one out — a browser-based sibling of `CommandRunnerDemo` built with
+[Vapor](https://vapor.codes) instead of SwiftUI. It's a standalone
+Swift package, not an Xcode project: `cd` into it and `swift run`,
+then open `http://localhost:8080`. See its own README for details.
+
 ## Documentation
 
 - [`PLATFORMS.md`](./PLATFORMS.md) — full list of supported device

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Swiftmiko — Command Runner (Web)</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <main>
+        <h1>Swiftmiko Command Runner</h1>
+        <p class="subtitle">
+            Web sibling of the SwiftUI CommandRunnerDemo — connects to a
+            Cisco IOS device over SSH and runs a show command.
+        </p>
+
+        #if(errorMessage):
+        <div class="banner error">#(errorMessage)</div>
+        #endif
+
+        <section class="card">
+            <h2>Connection</h2>
+            #if(isConnected):
+                <p class="status connected">
+                    <span class="dot"></span> Connected to <strong>#(connectedHost)</strong>
+                </p>
+                <form method="POST" action="/disconnect">
+                    <button type="submit" class="secondary">Disconnect</button>
+                </form>
+            #else:
+                <form method="POST" action="/connect" class="grid">
+                    <label>Host
+                        <input type="text" name="host" placeholder="192.168.1.1" required>
+                    </label>
+                    <label>Username
+                        <input type="text" name="username" placeholder="admin" required>
+                    </label>
+                    <label>Password
+                        <input type="password" name="password">
+                    </label>
+                    <label>Enable secret
+                        <input type="password" name="secret" placeholder="optional">
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" name="allowLegacyCiphers">
+                        Allow legacy AES-CBC ciphers
+                        <span class="hint">Only for old IOS images without AES-GCM support — a known-weaker cipher, lab/EOL gear only.</span>
+                    </label>
+                    <button type="submit">Connect</button>
+                </form>
+            #endif
+        </section>
+
+        <section class="card">
+            <h2>Command</h2>
+            <form method="POST" action="/run" class="grid">
+                <label>Pick a common command
+                    <select name="commandIndex">
+                        #for(option in commands):
+                        <option value="#(option.index)">#(option.label)</option>
+                        #endfor
+                    </select>
+                </label>
+                <label>...or type a custom one
+                    <input type="text" name="customCommand" placeholder="e.g. show ip interface brief">
+                </label>
+                <button type="submit" #if(!isConnected):disabled#endif>Run</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Output</h2>
+            <pre class="output">#(output)</pre>
+        </section>
+    </main>
+</body>
+</html>
