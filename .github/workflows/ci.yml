@@ -1,0 +1,43 @@
+name: CI
+
+# Swiftmiko is macOS-only (SerialChannel uses Darwin termios directly,
+# CCommonCryptoShim links CommonCrypto) — there's no Linux job here on
+# purpose, a Linux build would fail immediately on unrelated grounds.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pins a real Xcode install rather than relying on whatever
+      # macos-latest's runner image defaults to today.
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test

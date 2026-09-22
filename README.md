@@ -7,6 +7,12 @@
 <h1 align="center">Swiftmiko</h1>
 
 <p align="center">
+  <a href="https://github.com/stelicho/Swiftmiko/actions/workflows/ci.yml">
+    <img src="https://github.com/stelicho/Swiftmiko/actions/workflows/ci.yml/badge.svg" alt="CI status">
+  </a>
+</p>
+
+<p align="center">
   A native Swift port of <a href="https://github.com/ktbyers/netmiko">Netmiko</a> —
   multi-vendor network device SSH/Telnet automation, built for Swift and Apple platforms.
 </p>

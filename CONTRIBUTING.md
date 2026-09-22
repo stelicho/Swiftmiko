@@ -69,7 +69,11 @@ projects that depend on the local package.
    hardware model, or "compiles only") — this project's biggest open
    question is what actually works, so that detail matters more than
    usual.
-5. Open a PR against `main`.
+5. Open a PR against `main`. CI (`.github/workflows/ci.yml`) runs
+   `swift build`/`swift test` automatically on every PR — it can only
+   catch compile errors and the synthetic unit tests, not hardware
+   correctness, so a green check doesn't replace the "what did you
+   verify it against" note above.
 
 ## Reporting issues
 
