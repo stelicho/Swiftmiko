@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Reference — Swiftmiko</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <img class="logo" src="../Images/Swiftmiko-Icons/favicon/apple-touch-icon.png" alt="Swiftmiko icon">
+            <span class="site-title">Swiftmiko</span>
+            <nav class="site-nav">
+                <a href="./index.html">Overview</a>
+                <a href="./getting-started.html">Getting Started</a>
+                <a href="./api-reference.html" class="active">API Reference</a>
+                <a href="./examples.html">Examples</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="layout">
+            <div class="content">
+                <h1>API Reference</h1>
+                <p class="muted">
+                    The core types you'll use in nearly every program:
+                    <code>ConnectionProfile</code>, <code>AuthMethod</code>,
+                    <code>SSHDispatcher</code>, and <code>BaseConnection</code>
+                    (the class every vendor driver subclasses). Vendor-specific
+                    behavior beyond this shared surface is documented on each
+                    driver's subclass — see <code>PLATFORMS.md</code> for the
+                    full list.
+                </p>
+
+                <h2 id="connection-profile">ConnectionProfile</h2>
+                <p>
+                    A value type (<code>Sendable struct</code>) describing how
+                    to reach and authenticate to a device. Defined in
+                    <code>Sources/BaseConnection.swift</code>.
+                </p>
+                <table>
+                    <tr><th>Field</th><th>Type</th><th>Default</th><th>Notes</th></tr>
+                    <tr><td><code>host</code></td><td><code>String</code></td><td>—</td><td>Hostname or IP address.</td></tr>
+                    <tr><td><code>port</code></td><td><code>Int</code></td><td><code>22</code></td><td></td></tr>
+                    <tr><td><code>deviceType</code></td><td><code>String</code></td><td>—</td><td>Selects the driver, e.g. <code>"cisco_ios"</code>. A <code>_telnet</code> or <code>_serial</code> suffix selects that transport instead of SSH.</td></tr>
+                    <tr><td><code>username</code></td><td><code>String</code></td><td>—</td><td></td></tr>
+                    <tr><td><code>auth</code></td><td><a href="#auth-method"><code>AuthMethod</code></a></td><td>—</td><td></td></tr>
+                    <tr><td><code>secret</code></td><td><code>String?</code></td><td><code>nil</code></td><td>Enable-mode secret, if the platform needs one.</td></tr>
+                    <tr><td><code>connectionTimeout</code></td><td><code>TimeInterval</code></td><td><code>10</code></td><td></td></tr>
+                    <tr><td><code>authTimeout</code></td><td><code>TimeInterval</code></td><td><code>15</code></td><td></td></tr>
+                    <tr><td><code>bannerTimeout</code></td><td><code>TimeInterval</code></td><td><code>15</code></td><td></td></tr>
+                    <tr><td><code>readTimeout</code></td><td><code>TimeInterval</code></td><td><code>30</code></td><td>Default per-read timeout; individual slow commands can override it via <code>sendCommand(readTimeout:)</code>.</td></tr>
+                    <tr><td><code>sessionTimeout</code></td><td><code>TimeInterval</code></td><td><code>60</code></td><td></td></tr>
+                    <tr><td><code>fastCli</code></td><td><code>Bool</code></td><td><code>true</code></td><td></td></tr>
+                    <tr><td><code>strictHostKeyChecking</code></td><td><code>Bool</code></td><td><code>false</code></td><td></td></tr>
+                    <tr><td><code>allowAutoChange</code></td><td><code>Bool</code></td><td><code>false</code></td><td></td></tr>
+                    <tr><td><code>keepaliveInterval</code></td><td><code>Int</code></td><td><code>0</code></td><td></td></tr>
+                    <tr><td><code>returnCharacter</code></td><td><code>String</code></td><td><code>"\n"</code></td><td>Appended when writing commands.</td></tr>
+                    <tr><td><code>responseReturnCharacter</code></td><td><code>String</code></td><td><code>"\n"</code></td><td></td></tr>
+                    <tr><td><code>globalDelayFactor</code></td><td><code>Double</code></td><td><code>1.0</code></td><td>Multiplier applied to every internal settle-delay a driver requests. Equivalent to Netmiko's <code>global_delay_factor</code>.</td></tr>
+                    <tr><td><code>globalCmdVerify</code></td><td><code>Bool?</code></td><td><code>nil</code></td><td><code>nil</code> defers to the per-call default (<code>true</code>); set explicitly to override every call on this connection.</td></tr>
+                    <tr><td><code>allowedKeyExchangeAlgorithms</code></td><td><code>Set&lt;String&gt;?</code></td><td><code>nil</code></td><td>Overrides the transport's default SSH key-exchange algorithms.</td></tr>
+                    <tr><td><code>disabledPublicKeyAlgorithms</code></td><td><code>Set&lt;String&gt;?</code></td><td><code>nil</code></td><td></td></tr>
+                    <tr><td><code>serialSettings</code></td><td><code>SerialSettings?</code></td><td><code>nil</code></td><td>Used only for <code>_serial</code> device types; <code>nil</code> uses 9600 8N1.</td></tr>
+                    <tr><td><code>allowLegacyCiphers</code></td><td><code>Bool</code></td><td><code>false</code></td><td>Opt-in fallback to legacy AES-CBC ciphers for SSH servers too old to offer AES-GCM. Only for lab/EOL gear you control — CBC-mode ciphers have known weaknesses.</td></tr>
+                </table>
+
+                <h2 id="auth-method">AuthMethod</h2>
+                <p>Defined in <code>Sources/Channel.swift</code>:</p>
+                <pre><code>public enum AuthMethod: Sendable {
+    case password(String)
+    case keyFile(path: String, passphrase: String? = nil)
+    case sshAgent
+    case none
+}</code></pre>
+                <p>
+                    <code>keyFile</code> accepts an optional <code>passphrase:</code>
+                    for passphrase-protected keys. <code>sshAgent</code> defers to a
+                    running SSH agent. There is currently no <code>ssh_config_file</code>-style
+                    option — Swiftmiko talks to the transport directly rather than
+                    shelling out to a system SSH client.
+                </p>
+
+                <h2 id="ssh-dispatcher">SSHDispatcher</h2>
+                <p>The entry point for opening connections. Defined in <code>Sources/SSHDispatcher.swift</code>.</p>
+
+                <h3><code>connectHandler(profile:autoConnect:)</code></h3>
+                <pre><code>public static func connectHandler(
+    profile: ConnectionProfile,
+    autoConnect: Bool = true
+) async throws -> BaseConnection</code></pre>
+                <p>
+                    Looks up the registered driver for <code>profile.deviceType</code>,
+                    attaches the correct transport channel (SSH, Telnet, or serial —
+                    inferred from a <code>_telnet</code>/<code>_serial</code> suffix),
+                    and — unless <code>autoConnect</code> is <code>false</code> —
+                    connects and runs session preparation before returning. Throws
+                    <code>SwiftmikoError.connectionFailed</code> if <code>deviceType</code>
+                    isn't registered.
+                </p>
+
+                <h3><code>redispatch(_:deviceType:sessionPreparation:)</code></h3>
+                <pre><code>public static func redispatch(
+    _ connection: BaseConnection,
+    deviceType: String,
+    sessionPreparation: Bool = true
+) async throws -> BaseConnection</code></pre>
+                <p>
+                    Constructs a new driver instance for <code>deviceType</code> and
+                    transplants the original connection's already-open channel onto
+                    it — no reconnect, no re-authentication. Used for jumping
+                    through a terminal server onto a different device type
+                    (see <a href="./examples.html#terminal-server">the terminal server example</a>).
+                    The returned connection owns the channel; stop using the one you
+                    passed in.
+                </p>
+
+                <h3>Other statics</h3>
+                <table>
+                    <tr><th>Member</th><th>Purpose</th></tr>
+                    <tr><td><code>platforms: [String]</code></td><td>Every registered SSH/Telnet/serial <code>deviceType</code>.</td></tr>
+                    <tr><td><code>scpPlatforms: [String]</code></td><td>Every <code>deviceType</code> with SCP support.</td></tr>
+                    <tr><td><code>sshDispatcher(deviceType:)</code></td><td>Returns the raw connection factory for a device type, equivalent to Netmiko's <code>ssh_dispatcher</code>.</td></tr>
+                    <tr><td><code>makeFileTransfer(connection:...)</code></td><td>Constructs a <code>FileTransfer</code> for SCP, equivalent to Netmiko's SCP <code>FileTransfer</code> dispatcher.</td></tr>
+                </table>
+
+                <h3>Registering or overriding a driver</h3>
+                <p>
+                    <code>DispatcherRegistry.shared</code> lets you register a
+                    <code>deviceType</code> that has no built-in driver yet, or
+                    override an existing one (e.g. to swap in a test double):
+                </p>
+                <pre><code>await DispatcherRegistry.shared.registerConnection("some_new_device") {
+    SomeDriverSSH(profile: $0, channelProvider: nioSSHChannelProvider)
+}</code></pre>
+                <p>A registration made this way takes priority over anything in <code>SSHDispatcher.defaultConnectionFactories</code>.</p>
+
+                <h2 id="base-connection">BaseConnection</h2>
+                <p>
+                    The transport-neutral base class every vendor driver
+                    subclasses (equivalent to Netmiko's <code>base_connection.py</code>).
+                    Defined in <code>Sources/BaseConnection.swift</code>. Methods marked
+                    <code>open</code> are overridden per-vendor where the CLI behaves
+                    differently; the signatures below are the shared contract every
+                    driver honors.
+                </p>
+
+                <h3>Lifecycle</h3>
+                <table>
+                    <tr><th>Method</th><th>Signature</th><th>Notes</th></tr>
+                    <tr><td><code>connect()</code></td><td><code>async throws</code></td><td>Usually called for you by <code>SSHDispatcher.connectHandler</code>.</td></tr>
+                    <tr><td><code>disconnect()</code></td><td><code>async</code></td><td>Closes the transport. Always call this when you're done with a connection.</td></tr>
+                    <tr><td><code>isAlive()</code></td><td><code>async -&gt; Bool</code></td><td>Whether the underlying channel is still open.</td></tr>
+                </table>
+
+                <h3>Sending commands</h3>
+                <pre><code>open func sendCommand(
+    _ command: String,
+    readTimeout: TimeInterval? = nil,
+    expectString: String? = nil,
+    stripPrompt: Bool = true,
+    stripCommand: Bool = true,
+    cmdVerify: Bool = true,
+    autoFindPrompt: Bool = true
+) async throws -> String</code></pre>
+                <p>
+                    Writes the command, then waits for the device's prompt to
+                    reappear (or for <code>expectString</code>, a regex, if
+                    supplied instead) before returning. Strips the echoed
+                    command and trailing prompt from the output by default.
+                </p>
+
+                <pre><code>@discardableResult
+open func sendCommandTiming(
+    _ command: String,
+    readTimeout: TimeInterval = 2.0,
+    expectString: String? = nil,
+    stripPrompt: Bool = true,
+    stripCommand: Bool = true,
+    cmdVerify: Bool = true
+) async throws -> String</code></pre>
+                <p>
+                    A purely delay-based send — waits a fixed amount of time
+                    rather than for a prompt match. Use it for interactive
+                    prompts that don't cleanly match a pattern (Netmiko's
+                    <code>send_command_timing</code>).
+                </p>
+
+                <pre><code>@discardableResult
+open func sendMultiline(
+    _ commands: [String],
+    expectString: String
+) async throws -> String</code></pre>
+                <p>Sends several commands, each waiting for the same shared <code>expectString</code>. Doesn't assume config mode, unlike <code>sendConfigSet</code>.</p>
+
+                <h3>Configuration changes</h3>
+                <pre><code>@discardableResult
+open func sendConfigSet(
+    _ commands: [String],
+    exitConfigMode: Bool = true,
+    readTimeout: TimeInterval? = nil,
+    maxLoops: Int? = nil,
+    stripPrompt: Bool = false,
+    stripCommand: Bool = false,
+    configModeCommand: String? = nil,
+    cmdVerify: Bool = true,
+    enterConfigMode: Bool = true,
+    errorPattern: String = "",
+    terminator: String = "#",
+    bypassCommands: String? = nil
+) async throws -> String</code></pre>
+                <p>
+                    Enters config mode, runs each command in <code>commands</code>
+                    in order, and exits config mode again — all by default.
+                    Pass a non-empty <code>errorPattern</code> to have it throw
+                    <code>SwiftmikoError.commandFailed</code> as soon as any
+                    command's output matches. Throws
+                    <code>SwiftmikoError.configModeNotSupported</code> on
+                    platforms without a config mode.
+                </p>
+                <p>
+                    Persisting the change (Cisco's <code>write memory</code> /
+                    <code>copy run start</code>) is a separate step — see
+                    <code>saveConfig()</code> below.
+                </p>
+
+                <h3>Prompt and mode</h3>
+                <table>
+                    <tr><th>Method</th><th>Notes</th></tr>
+                    <tr><td><code>findPrompt(delay:pattern:) async throws -&gt; String</code></td><td>Returns the device's current prompt.</td></tr>
+                    <tr><td><code>setBasePrompt(primaryTerminator:altTerminator:delay:pattern:) async throws</code></td><td>Detects and caches the base prompt; called automatically during session preparation.</td></tr>
+                    <tr><td><code>sessionPreparation() async throws</code></td><td>Disables paging and detects the base prompt. Runs automatically inside <code>connectHandler</code>.</td></tr>
+                    <tr><td><code>disablePaging(command:delay:cmdVerify:pattern:) async throws -&gt; String</code></td><td><code>open</code> — throws <code>SwiftmikoError.notImplemented</code> unless a driver overrides it.</td></tr>
+                    <tr><td><code>enterEnableMode(secret:command:pattern:enablePattern:checkState:caseInsensitive:defaultUsername:) async throws -&gt; String</code></td><td><code>open</code> — base implementation throws <code>notImplemented</code>; vendor drivers with a privileged mode override it (e.g. <code>CiscoBaseConnection</code>).</td></tr>
+                    <tr><td><code>isInEnableMode(checkString:) async throws -&gt; Bool</code></td><td></td></tr>
+                    <tr><td><code>exitEnableMode(exitCommand:) async throws -&gt; String</code></td><td></td></tr>
+                    <tr><td><code>enterConfigMode(command:pattern:dotAll:) async throws -&gt; String</code></td><td>Throws <code>configModeNotSupported</code> if the platform has no config mode.</td></tr>
+                    <tr><td><code>exitConfigMode(exitConfig:pattern:) async throws -&gt; String</code></td><td></td></tr>
+                    <tr><td><code>isInConfigMode(checkString:) async throws -&gt; Bool</code></td><td></td></tr>
+                </table>
+
+                <h3>Low-level channel access</h3>
+                <p>Reach for these only when the higher-level helpers above don't fit your interaction:</p>
+                <table>
+                    <tr><th>Method</th><th>Notes</th></tr>
+                    <tr><td><code>writeChannel(_:) async throws</code></td><td>Writes raw data to the transport.</td></tr>
+                    <tr><td><code>readChannel() async throws -&gt; String</code></td><td>Reads whatever is currently available.</td></tr>
+                    <tr><td><code>readChannelTiming(readTimeout:) async throws -&gt; String</code></td><td></td></tr>
+                    <tr><td><code>readUntilPrompt(...) async throws -&gt; String</code></td><td></td></tr>
+                    <tr><td><code>readUntilPromptOrPattern(...) async throws -&gt; String</code></td><td></td></tr>
+                    <tr><td><code>readUntilPattern(...) async throws -&gt; String</code></td><td></td></tr>
+                    <tr><td><code>clearBuffer() async throws</code></td><td></td></tr>
+                </table>
+
+                <h2 id="vendor-subclasses">Vendor subclasses</h2>
+                <p>
+                    <code>connectHandler</code> returns a plain <code>BaseConnection</code>.
+                    Behavior specific to a vendor family — things Netmiko models
+                    with mixins — lives on that family's subclass, and you'll
+                    need to downcast to reach it:
+                </p>
+                <pre><code>// cisco_ios resolves to CiscoIOSSSH, a CiscoBaseConnection subclass —
+// saveConfig() is declared there, one level below BaseConnection.
+let connection = try await SSHDispatcher.connectHandler(profile: profile) as! CiscoBaseConnection
+
+var output = try await connection.sendConfigSet(["logging buffered 100000"])
+output += try await connection.saveConfig()
+await connection.disconnect()</code></pre>
+                <p>
+                    <code>CiscoBaseConnection</code> (<code>Sources/CiscoBaseConnection.swift</code>)
+                    adds <code>saveConfig()</code>, and overrides
+                    <code>enterEnableMode</code>/<code>exitEnableMode</code>/<code>exitConfigMode</code>
+                    for the Cisco family. Junos-style <code>commit()</code> is not
+                    yet ported for Cisco XR / Juniper Junos / Palo Alto — check
+                    <code>PLATFORMS.md</code> before relying on a given driver's
+                    surface beyond the <code>BaseConnection</code> contract.
+                </p>
+
+                <h2 id="errors">Error handling</h2>
+                <p><code>SwiftmikoError</code> (<code>Sources/Exceptions.swift</code>) is the error type thrown across the library:</p>
+                <table>
+                    <tr><th>Case</th><th>When</th></tr>
+                    <tr><td><code>connectionFailed(String)</code></td><td>Unknown <code>deviceType</code>, or the transport failed to open.</td></tr>
+                    <tr><td><code>authenticationFailed(String)</code></td><td>Credentials were rejected.</td></tr>
+                    <tr><td><code>timeout(String)</code></td><td>A read exceeded its timeout.</td></tr>
+                    <tr><td><code>noConnection</code></td><td>An operation was attempted with no open channel.</td></tr>
+                    <tr><td><code>configModeNotSupported</code></td><td><code>enterConfigMode</code>/<code>sendConfigSet</code> called on a platform without a config mode.</td></tr>
+                    <tr><td><code>unexpectedPrompt(String)</code></td><td>Prompt detection didn't find what it expected.</td></tr>
+                    <tr><td><code>commandFailed(String)</code></td><td>A <code>sendConfigSet</code> command matched a supplied <code>errorPattern</code>.</td></tr>
+                    <tr><td><code>invalidArgument(String)</code></td><td>Caller passed an invalid parameter.</td></tr>
+                    <tr><td><code>notImplemented(String)</code></td><td>An <code>open</code> hook (e.g. <code>enterEnableMode</code>, <code>disablePaging</code>) has no override for this driver yet.</td></tr>
+                    <tr><td><code>channelClosed</code></td><td>The transport closed unexpectedly.</td></tr>
+                    <tr><td><code>alreadyConnected</code></td><td><code>connect()</code> called twice on the same instance.</td></tr>
+                    <tr><td><code>scpTransferFailed(String)</code></td><td>SCP transfer or verification failed.</td></tr>
+                    <tr><td><code>promptDetectionFailed(String)</code></td><td>Base prompt detection failed outright.</td></tr>
+                </table>
+                <p><code>SwiftmikoError</code> conforms to <code>LocalizedError</code>, so <code>error.localizedDescription</code> gives a readable message for each case.</p>
+            </div>
+            <aside class="toc">
+                <h4>On this page</h4>
+                <ul>
+                    <li><a href="#connection-profile">ConnectionProfile</a></li>
+                    <li><a href="#auth-method">AuthMethod</a></li>
+                    <li><a href="#ssh-dispatcher">SSHDispatcher</a></li>
+                    <li><a href="#base-connection">BaseConnection</a></li>
+                    <li><a href="#vendor-subclasses">Vendor subclasses</a></li>
+                    <li><a href="#errors">Error handling</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        Swiftmiko is MIT licensed. Full credit to
+        <a href="https://github.com/ktbyers">Kirk Byers</a> and the Netmiko community.
+    </footer>
+</body>
+</html>

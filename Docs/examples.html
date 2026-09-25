@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples — Swiftmiko</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <img class="logo" src="../Images/Swiftmiko-Icons/favicon/apple-touch-icon.png" alt="Swiftmiko icon">
+            <span class="site-title">Swiftmiko</span>
+            <nav class="site-nav">
+                <a href="./index.html">Overview</a>
+                <a href="./getting-started.html">Getting Started</a>
+                <a href="./api-reference.html">API Reference</a>
+                <a href="./examples.html" class="active">Examples</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="layout">
+            <div class="content">
+                <h1>Examples</h1>
+                <p class="muted">
+                    Common connection patterns, translated from
+                    <a href="https://github.com/ktbyers/netmiko/blob/develop/EXAMPLES.md">Netmiko's own examples</a>
+                    into Swift. <code>readSecurely(_:)</code> below is a
+                    stand-in for however your program prompts for credentials —
+                    don't hardcode real passwords. This page is a curated
+                    subset; see <code>EXAMPLES.md</code> in the repository
+                    root for the complete, continuously updated set, plus the
+                    runnable SwiftUI apps under <code>Examples/</code>.
+                </p>
+
+                <h2 id="simple">Simple connection</h2>
+                <pre><code>import Swiftmiko
+
+let profile = ConnectionProfile(
+    host: "cisco1.lasthop.io",
+    deviceType: "cisco_ios",
+    username: "pyclass",
+    auth: .password(readSecurely("Password: "))
+)
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+print(try await connection.findPrompt())
+await connection.disconnect()</code></pre>
+
+                <h2 id="enable-mode">Enable mode</h2>
+                <pre><code>let profile = ConnectionProfile(
+    host: "cisco1.lasthop.io",
+    deviceType: "cisco_ios",
+    username: "pyclass",
+    auth: .password(readSecurely("Password: ")),
+    secret: readSecurely("Enter secret: ")
+)
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+try await connection.enterEnableMode(secret: profile.secret ?? "")
+print(try await connection.findPrompt())
+await connection.disconnect()</code></pre>
+
+                <h2 id="show-command">Executing a show command</h2>
+                <pre><code>let connection = try await SSHDispatcher.connectHandler(profile: profile)
+// sendCommand automatically strips the command echo and trailing prompt.
+let output = try await connection.sendCommand("show ip int brief")
+await connection.disconnect()
+print(output)</code></pre>
+
+                <h2 id="prompting-commands">Commands that prompt mid-command</h2>
+                <p>
+                    Some commands prompt for more input while running (for
+                    example, a confirmation before deleting a file). Two
+                    approaches:
+                </p>
+                <h3>Timing-based</h3>
+                <p><code>sendCommandTiming</code> is purely delay-based — it doesn't wait for a prompt match, which suits interactions like this one:</p>
+                <pre><code>var output = try await connection.sendCommandTiming(
+    "delete flash:/test3.txt",
+    stripPrompt: false,
+    stripCommand: false
+)
+if output.contains("Delete filename") {
+    output += try await connection.sendCommandTiming("\n", stripPrompt: false, stripCommand: false)
+}
+if output.contains("confirm") {
+    output += try await connection.sendCommandTiming("y", stripPrompt: false, stripCommand: false)
+}</code></pre>
+
+                <h3>Expect-string based</h3>
+                <p>The same interaction using <code>sendCommand</code>'s <code>expectString</code> parameter — a regex Swiftmiko waits for instead of the connection's normal prompt pattern:</p>
+                <pre><code>var output = try await connection.sendCommand(
+    "delete flash:/test4.txt",
+    expectString: "Delete filename", stripPrompt: false, stripCommand: false
+)
+output += try await connection.sendCommand("\n", expectString: "confirm", stripPrompt: false, stripCommand: false)
+output += try await connection.sendCommand("y", expectString: "#", stripPrompt: false, stripCommand: false)</code></pre>
+
+                <h2 id="delay-factor">Slowing everything down with globalDelayFactor</h2>
+                <p><code>ConnectionProfile.globalDelayFactor</code> scales every internal settle-delay a driver requests — set it once rather than per call:</p>
+                <pre><code>var profile = ConnectionProfile(
+    host: "cisco1.lasthop.io", deviceType: "cisco_ios",
+    username: "pyclass", auth: .password(readSecurely("Password: "))
+)
+profile.globalDelayFactor = 2.0 // doubles every internal delay this driver requests
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+let output = try await connection.sendCommand("show ip arp")</code></pre>
+
+                <h2 id="config-changes">Configuration changes</h2>
+                <pre><code>let connection = try await SSHDispatcher.connectHandler(profile: profile) as! CiscoBaseConnection
+
+var output = try await connection.sendConfigSet(["logging buffered 100000"])
+output += try await connection.saveConfig()
+await connection.disconnect()</code></pre>
+                <p><code>sendConfigSet</code> automatically enters and exits config mode; <code>saveConfig</code> persists it (declared on <code>CiscoBaseConnection</code> — see the <a href="./api-reference.html#vendor-subclasses">vendor subclasses</a> note).</p>
+
+                <h3>From a file</h3>
+                <pre><code>import Foundation
+
+let contents = try String(contentsOfFile: "config_changes.txt", encoding: .utf8)
+let commands = contents
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+    .components(separatedBy: .newlines)
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile) as! CiscoBaseConnection
+var output = try await connection.sendConfigSet(commands)
+output += try await connection.saveConfig()</code></pre>
+
+                <h2 id="ssh-keys">SSH keys</h2>
+                <pre><code>let profile = ConnectionProfile(
+    host: "cisco1.lasthop.io", deviceType: "cisco_ios",
+    username: "testuser",
+    auth: .keyFile(path: "~/.ssh/test_rsa")
+)
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+let output = try await connection.sendCommand("show ip arp")</code></pre>
+                <p><code>AuthMethod.keyFile</code> also accepts a <code>passphrase:</code> for passphrase-protected keys; <code>AuthMethod.sshAgent</code> defers to a running SSH agent instead.</p>
+
+                <h2 id="session-log">Session log</h2>
+                <p><code>SSHDispatcher.connectHandler</code> doesn't take a session-log parameter, so construct the concrete driver directly — <code>sessionLog:</code> is a <code>BaseConnection</code> initializer parameter every driver inherits:</p>
+                <pre><code>let connection = CiscoIOSSSH(
+    profile: profile,
+    sessionLog: SessionLogConfig(filePath: "output.txt", recordWrites: true),
+    channelProvider: nioSSHChannelProvider
+)
+try await connection.connect()
+let output = try await connection.sendCommand("show ip int brief")
+await connection.disconnect()</code></pre>
+                <p>Passwords and secrets on the profile are automatically redacted in the log. Set <code>recordWrites: false</code> (the default) to log only what's read back from the device, not what was sent.</p>
+
+                <h2 id="secure-copy">Secure Copy</h2>
+                <pre><code>let connection = try await SSHDispatcher.connectHandler(profile: profile)
+
+// A secure copy server must be enabled on the device ("ip scp server enable").
+let result = try await fileTransfer(
+    sshConnection: connection,
+    sourceFile: "test1.txt",
+    destinationFile: "test1.txt",
+    fileSystem: "flash:",
+    direction: .put,
+    overwriteFile: true,
+    scpClient: NIOSCPClient(profile: connection.profile)
+)
+
+print(result.dictionary)
+// ["file_exists": false, "file_transferred": true, "file_verified": true]</code></pre>
+                <p><code>fileTransfer</code> checks whether the destination exists, verifies free space, transfers, and MD5-verifies. For direct control, drive a <code>FileTransfer</code> yourself:</p>
+                <pre><code>let transfer = try await FileTransfer(
+    connection: connection,
+    sourceFile: "test1.txt", destinationFile: "test1.txt",
+    fileSystem: "flash:", direction: .put,
+    scpClient: NIOSCPClient(profile: connection.profile)
+)
+try await transfer.establishSCPConnection()
+try await transfer.transferFile()
+let verified = try await transfer.verifyFile()
+await transfer.closeSCPChannel()</code></pre>
+
+                <h2 id="autodetect">Auto-detecting the device type</h2>
+                <h3>Over SSH</h3>
+                <pre><code>let probe = try await SSHDispatcher.connectHandler(profile: profile)
+
+let guesser = try await SSHDetect(connection: probe)
+// autodetect() disconnects `probe` itself before returning — don't call
+// connection.disconnect() on it afterward.
+let bestMatch = await guesser.autodetect()
+print(bestMatch as Any)          // best-guess deviceType
+print(guesser.potentialMatches)  // every rule that scored > 0, and its score
+
+if let bestMatch {
+    profile.deviceType = bestMatch
+    let connection = try await SSHDispatcher.connectHandler(profile: profile)
+}</code></pre>
+
+                <h3>Over SNMPv2c / SNMPv3</h3>
+                <pre><code>let detector = try SNMPDetect(
+    hostname: "cisco1.lasthop.io",
+    snmpVersion: .v2c,
+    community: readSecurely("Enter SNMP community: ")
+)
+guard let deviceType = try await detector.autodetect() else {
+    fatalError("SNMP failed!")
+}</code></pre>
+                <p><code>SNMPDetect</code> needs an <code>SNMPTransport</code> implementation supplied to actually talk SNMP on the wire — Swiftmiko doesn't bundle one, matching Netmiko's own dependency on the external <code>pysnmp</code> package for this feature.</p>
+
+                <h2 id="terminal-server">Terminal server and redispatch</h2>
+                <p>
+                    Bouncing through a switch, into a terminal server over
+                    Telnet, then out a console port to a third device — using
+                    <code>redispatch</code> to swap the active driver at each
+                    hop without reconnecting:
+                </p>
+                <pre><code>var connection = try await SSHDispatcher.connectHandler(
+    profile: ConnectionProfile(
+        host: publicIP, deviceType: "cisco_s300",
+        username: "admin", auth: .password(readSecurely("Enter password of s300: "))
+    )
+)
+
+// Telnet to the terminal server from the switch's own CLI.
+try await connection.writeChannel("telnet \(terminalServerIP)\n")
+try await connection.telnetLogin()
+
+// Made it to the terminal server; redispatch to the real driver for
+// whatever's actually attached to it.
+connection = try await SSHDispatcher.redispatch(connection, deviceType: "cisco_ios")
+try await connection.enterEnableMode(secret: readSecurely("Enter enable secret: "))
+
+// Hop again to the end device via the terminal server (a Juniper SRX).
+try await connection.writeChannel("srx2\n")
+try await connection.telnetLogin()
+connection = try await SSHDispatcher.redispatch(connection, deviceType: "juniper_junos")
+
+let output = try await connection.sendCommand("show version")
+await connection.disconnect()</code></pre>
+                <p>
+                    Each call to <code>redispatch</code> returns a new
+                    connection object that now owns the channel — don't keep
+                    using the one you passed in. If the first hop has no real
+                    CLI to prepare a session against, connect with
+                    <code>deviceType: "generic_termserver"</code> (or its
+                    Telnet variant) instead of a real vendor driver, then
+                    redispatch once you've reached something with an actual
+                    CLI.
+                </p>
+
+                <h2 id="structured-output">A note on structured output</h2>
+                <p>
+                    Netmiko's <code>use_textfsm</code>/<code>use_genie</code>/<code>use_ttp</code>
+                    parsers have no Swift equivalent yet. <code>sendCommand</code>
+                    always returns a plain <code>String</code>; parsing that
+                    into structured data is currently left to the caller.
+                </p>
+            </div>
+            <aside class="toc">
+                <h4>On this page</h4>
+                <ul>
+                    <li><a href="#simple">Simple connection</a></li>
+                    <li><a href="#enable-mode">Enable mode</a></li>
+                    <li><a href="#show-command">Show command</a></li>
+                    <li><a href="#prompting-commands">Prompting commands</a></li>
+                    <li><a href="#delay-factor">globalDelayFactor</a></li>
+                    <li><a href="#config-changes">Config changes</a></li>
+                    <li><a href="#ssh-keys">SSH keys</a></li>
+                    <li><a href="#session-log">Session log</a></li>
+                    <li><a href="#secure-copy">Secure Copy</a></li>
+                    <li><a href="#autodetect">Auto-detection</a></li>
+                    <li><a href="#terminal-server">Terminal server</a></li>
+                    <li><a href="#structured-output">Structured output</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        Swiftmiko is MIT licensed. Full credit to
+        <a href="https://github.com/ktbyers">Kirk Byers</a> and the Netmiko community.
+    </footer>
+</body>
+</html>

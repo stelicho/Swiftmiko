@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started — Swiftmiko</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <img class="logo" src="../Images/Swiftmiko-Icons/favicon/apple-touch-icon.png" alt="Swiftmiko icon">
+            <span class="site-title">Swiftmiko</span>
+            <nav class="site-nav">
+                <a href="./index.html">Overview</a>
+                <a href="./getting-started.html" class="active">Getting Started</a>
+                <a href="./api-reference.html">API Reference</a>
+                <a href="./examples.html">Examples</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="layout">
+            <div class="content">
+                <h1>Getting Started</h1>
+                <p class="muted">Install the package and make your first connection.</p>
+
+                <h2 id="requirements">Requirements</h2>
+                <ul>
+                    <li>Xcode 16+ / Swift 5.9+</li>
+                    <li>macOS 14+ (for the library target)</li>
+                </ul>
+
+                <h2 id="installing">Installing</h2>
+                <p>Swiftmiko is a Swift Package. Add it to your <code>Package.swift</code>:</p>
+                <pre><code>dependencies: [
+    .package(url: "https://github.com/stelicho/Swiftmiko.git", branch: "main")
+]</code></pre>
+                <p>Or in Xcode: <strong>File → Add Package Dependencies…</strong> and paste the repository URL.</p>
+                <p>
+                    Then add <code>"Swiftmiko"</code> as a dependency of your target and
+                    <code>import Swiftmiko</code> wherever you need it.
+                </p>
+
+                <h2 id="first-connection">Your first connection</h2>
+                <p>
+                    Every connection starts with a <a href="./api-reference.html#connection-profile"><code>ConnectionProfile</code></a> —
+                    a value type describing the host, credentials, and how to talk to
+                    it — and goes through
+                    <a href="./api-reference.html#ssh-dispatcher"><code>SSHDispatcher.connectHandler(profile:)</code></a>,
+                    which looks up the right vendor driver for <code>deviceType</code>
+                    and opens the transport for you.
+                </p>
+                <pre><code>import Swiftmiko
+
+let profile = ConnectionProfile(
+    host: "cisco1.lasthop.io",
+    deviceType: "cisco_ios",
+    username: "pyclass",
+    auth: .password("your-password-here")
+)
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+print(try await connection.findPrompt())
+await connection.disconnect()</code></pre>
+
+                <p>Breaking that down:</p>
+                <ul>
+                    <li><code>deviceType</code> selects the driver — <code>"cisco_ios"</code>, <code>"juniper_junos"</code>, <code>"arista_eos"</code>, and 150+ others. Passing an unregistered string throws <code>SwiftmikoError.connectionFailed</code> listing every currently supported type.</li>
+                    <li><code>auth</code> is an <a href="./api-reference.html#auth-method"><code>AuthMethod</code></a> — <code>.password(_:)</code> here, or <code>.keyFile(path:passphrase:)</code> / <code>.sshAgent</code> for key-based auth.</li>
+                    <li><code>connectHandler</code> opens the transport (SSH, Telnet, or serial, chosen automatically from a <code>_telnet</code>/<code>_serial</code> suffix on <code>deviceType</code>) and runs the driver's session preparation (disabling paging, detecting the prompt) before returning.</li>
+                    <li><code>disconnect()</code> always closes the underlying transport cleanly — call it once you're done, including on error paths.</li>
+                </ul>
+
+                <div class="callout">
+                    <strong>Never hardcode real credentials</strong>
+                    The snippets on this site use plain string literals for
+                    brevity. In real code, read passwords from a secure prompt,
+                    keychain, or environment variable — never commit them.
+                    Swiftmiko's own CLI tools use a small <code>termios</code>-based
+                    helper (<code>promptSecure</code> in <code>Sources/CLITools/CommonOptions.swift</code>)
+                    to read a password without echoing it to the terminal.
+                </div>
+
+                <h2 id="running-commands">Running a command</h2>
+                <p>
+                    <code>sendCommand</code> writes the command, waits for the
+                    device's prompt to reappear, and strips the echoed command
+                    and trailing prompt from the result:
+                </p>
+                <pre><code>let output = try await connection.sendCommand("show ip int brief")
+print(output)</code></pre>
+
+                <h2 id="privileged-mode">Entering privileged (enable) mode</h2>
+                <p>Devices that distinguish user vs. privileged EXEC mode need an explicit step before you can run config commands:</p>
+                <pre><code>try await connection.enterEnableMode(secret: "enablepass")</code></pre>
+
+                <h2 id="next-steps">Next steps</h2>
+                <div class="card-grid">
+                    <a class="card" href="./api-reference.html">
+                        <h3>API Reference →</h3>
+                        <p>The full shape of <code>ConnectionProfile</code>, <code>BaseConnection</code>, and error handling.</p>
+                    </a>
+                    <a class="card" href="./examples.html">
+                        <h3>Examples →</h3>
+                        <p>Config changes, SSH keys, session logging, SCP file transfer, and more.</p>
+                    </a>
+                </div>
+            </div>
+            <aside class="toc">
+                <h4>On this page</h4>
+                <ul>
+                    <li><a href="#requirements">Requirements</a></li>
+                    <li><a href="#installing">Installing</a></li>
+                    <li><a href="#first-connection">Your first connection</a></li>
+                    <li><a href="#running-commands">Running a command</a></li>
+                    <li><a href="#privileged-mode">Enable mode</a></li>
+                    <li><a href="#next-steps">Next steps</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        Swiftmiko is MIT licensed. Full credit to
+        <a href="https://github.com/ktbyers">Kirk Byers</a> and the Netmiko community.
+    </footer>
+</body>
+</html>
