@@ -24,14 +24,19 @@
 /// see https://forums.swift.org/t/clarify-the-cryptographic-properties-of-systemrandomnumbergenerator/27249
 /// for more details.
 ///
-/// We feel confident that the `SystemRandomNumberGenerator` will remain a CSPRNG on all Apple platforms
-/// and on Linux for the foreseeable future. This CSPRNG therefore wraps the `SystemRandomNumberGenerator`
-/// on those platforms, and traps on all others.
+/// We feel confident that the `SystemRandomNumberGenerator` will remain a CSPRNG on all Apple platforms,
+/// on Linux, and on Windows for the foreseeable future — on Windows the standard library's
+/// implementation is backed by `BCryptGenRandom`, the platform's own CSPRNG primitive. This CSPRNG
+/// therefore wraps the `SystemRandomNumberGenerator` on those platforms, and traps on all others.
+///
+/// Fork addition (not part of upstream swift-nio-ssh): added `os(Windows)` to the allowlist below.
+/// Upstream traps here on Windows, which crashes every outbound SSH packet (writeSSHPaddingBytes)
+/// and every key exchange (createKeyExchangeMessage) — i.e. SSH never works on Windows at all.
 struct CSPRNG: RandomNumberGenerator {
     private var baseRNG: SystemRandomNumberGenerator
 
     init() {
-        #if canImport(Darwin) || os(Linux) || os(Android)
+        #if canImport(Darwin) || os(Linux) || os(Android) || os(Windows)
         self.baseRNG = SystemRandomNumberGenerator()
         #else
         fatalError("Platform does not have a supported CSPRNG")

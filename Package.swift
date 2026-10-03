@@ -23,16 +23,11 @@ let package = Package(
         // Key Exchange/ClassicDiffieHellmanKeyExchange.swift in that checkout.
         .package(path: "Sources/swift-nio-ssh"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0"..<"5.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0")
     ],
     targets: [
-        // System-library shim exposing CommonCrypto's AES-CBC primitive, used
-        // only by the opt-in legacy-cipher transport (see LegacyCBCTransportProtection.swift).
-        .systemLibrary(
-            name: "CCommonCryptoShim",
-            path: "Sources/CCommonCryptoShim"
-        ),
         // Core Library (Explicitly exclude CLITools)
         .target(
             name: "Swiftmiko",
@@ -41,10 +36,13 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
                 .product(name: "Logging", package: "swift-log"),
-                "CCommonCryptoShim"
+                // Cross-platform (BoringSSL-backed) AES-CBC, replacing a prior
+                // CommonCrypto shim that only built on Apple platforms — see
+                // LegacyCBCTransportProtection.swift.
+                .product(name: "_CryptoExtras", package: "swift-crypto")
             ],
             path: "Sources",
-            exclude: ["CLITools", "CCommonCryptoShim", "swift-nio-ssh"]
+            exclude: ["CLITools", "swift-nio-ssh"]
         ),
         // Shared CLI Helper Library
         .target(

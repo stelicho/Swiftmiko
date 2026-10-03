@@ -97,8 +97,9 @@ var profile = ConnectionProfile(/* ... */)
 profile.allowLegacyCiphers = true
 ```
 
-This is implemented via a `CommonCrypto`-backed AES-CBC shim (see
-`Sources/CCommonCryptoShim/` and
+This is implemented via a cross-platform AES-CBC wrapper backed by
+swift-crypto's `_CryptoExtras` module (see
+`Sources/LegacyCBCTransportProtection.swift` and
 `Tests/SwiftmikoTests/LegacyCBCTransportProtectionTests.swift`) and
 defaults to `false` — leave it off for anything but lab/EOL gear you
 control.

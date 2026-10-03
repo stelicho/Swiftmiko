@@ -41,10 +41,15 @@ Xcode users can open the package directory directly (`open
 Package.swift`) or the `Examples/` targets, which are ordinary Xcode
 projects that depend on the local package.
 
+`swift build` / `swift test` work the same way on macOS, Linux, and
+Windows — the core library and CLI tools are cross-platform. The
+`Examples/` apps are SwiftUI and only build on an Apple platform.
+
 ### Requirements
 
-- Swift 5.9+ / Xcode 16+
-- macOS 14+ (library target)
+- Swift 6.1+ (swift-nio / swift-crypto's manifests require it)
+- macOS 14+, iOS 16+, iPadOS 16+, Linux, or Windows (library target)
+- Xcode 16+ if you're on an Apple platform or building `Examples/`
 
 ## Code style
 

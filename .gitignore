@@ -3,3 +3,6 @@
 *.xcuserstate
 xcuserdata/
 .DS_Store
+
+# Published to the GitHub wiki repo (Swiftmiko.wiki.git), not this repo.
+wiki/

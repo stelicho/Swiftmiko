@@ -22,64 +22,57 @@
 //  default — callers must opt in via ConnectionProfile.allowLegacyCiphers.
 //
 
-import CCommonCryptoShim
 import Crypto
+import CryptoExtras
 import Foundation
 import NIOCore
 import NIOSSH
 
-// MARK: - CommonCrypto CBC wrapper
+// MARK: - CBC wrapper
 
-/// Thin, stateful wrapper around a CommonCrypto `CCCryptorRef` running in
-/// CBC mode with no padding. SSH's traditional CBC framing chains the IV
-/// continuously across the whole connection (not per-packet), which is
-/// exactly what a single long-lived `CCCryptorRef` gives us for free: each
-/// call to `update` continues the chain from the ciphertext of the
-/// previous call.
+/// Thin, stateful wrapper around swift-crypto's `AES._CBC` (BoringSSL-backed,
+/// available identically on every platform). SSH's traditional CBC framing
+/// chains the IV continuously across the whole connection (not per-packet),
+/// but `AES._CBC.encrypt`/`decrypt` are one-shot, whole-buffer operations
+/// with no notion of a persistent cipher context — so instead this tracks
+/// the running IV by hand: each call reinitializes with the IV left over
+/// from the previous call (the last ciphertext block), which is
+/// mathematically identical to a single continuously-chained CBC stream.
 private final class CBCCryptor {
-    private var ref: CCCryptorRef?
-
-    init(operation: CCOperation, key: [UInt8], iv: [UInt8]) throws {
-        var ref: CCCryptorRef?
-        let status = CCCryptorCreateWithMode(
-            operation,
-            CCMode(kCCModeCBC),
-            CCAlgorithm(kCCAlgorithmAES),
-            CCPadding(ccNoPadding),
-            iv,
-            key,
-            key.count,
-            nil,
-            0,
-            0,
-            CCModeOptions(0),
-            &ref
-        )
-        guard status == kCCSuccess, let ref else {
-            throw SwiftmikoError.connectionFailed("Failed to initialize AES-CBC cryptor (CommonCrypto status \(status))")
-        }
-        self.ref = ref
+    enum Operation {
+        case encrypt
+        case decrypt
     }
 
-    deinit {
-        if let ref {
-            CCCryptorRelease(ref)
-        }
+    private let operation: Operation
+    private let key: SymmetricKey
+    private var iv: [UInt8]
+
+    init(operation: Operation, key: [UInt8], iv: [UInt8]) throws {
+        self.operation = operation
+        self.key = SymmetricKey(data: key)
+        self.iv = iv
     }
 
     /// Encrypts or decrypts `input` in place, continuing this cryptor's CBC chain.
     /// `input.count` must be a non-zero multiple of the AES block size (16).
     func update(_ input: inout [UInt8]) throws {
-        guard let ref else {
-            throw SwiftmikoError.connectionFailed("AES-CBC cryptor used after release")
+        do {
+            let ivValue = try AES._CBC.IV(ivBytes: iv)
+            switch operation {
+            case .encrypt:
+                let ciphertext = Array(try AES._CBC.encrypt(input, using: key, iv: ivValue, noPadding: true))
+                iv = Array(ciphertext.suffix(16))
+                input = ciphertext
+            case .decrypt:
+                let ciphertext = input
+                let plaintext = Array(try AES._CBC.decrypt(ciphertext, using: key, iv: ivValue, noPadding: true))
+                iv = Array(ciphertext.suffix(16))
+                input = plaintext
+            }
+        } catch {
+            throw SwiftmikoError.connectionFailed("AES-CBC operation failed: \(error)")
         }
-        var output = [UInt8](repeating: 0, count: input.count)
-        var moved = 0
-        let status = CCCryptorUpdate(ref, input, input.count, &output, output.count, &moved)
-        guard status == kCCSuccess, moved == input.count else {
-            throw SwiftmikoError.connectionFailed("AES-CBC operation failed (CommonCrypto status \(status))")
-        }
-        input = output
     }
 }
 
@@ -144,12 +137,12 @@ public class CBCTransportProtection {
         }
 
         self.outboundCryptor = try CBCCryptor(
-            operation: CCOperation(kCCEncrypt),
+            operation: .encrypt,
             key: initialKeys.outboundEncryptionKey.withUnsafeBytes { Array($0) },
             iv: initialKeys.initialOutboundIV
         )
         self.inboundCryptor = try CBCCryptor(
-            operation: CCOperation(kCCDecrypt),
+            operation: .decrypt,
             key: initialKeys.inboundEncryptionKey.withUnsafeBytes { Array($0) },
             iv: initialKeys.initialInboundIV
         )
@@ -183,12 +176,12 @@ extension CBCTransportProtection: NIOSSHTransportProtection {
         // A rekey resets the CBC chain, which is correct: the new IVs are
         // freshly derived specifically so the cipher state starts clean.
         self.outboundCryptor = try CBCCryptor(
-            operation: CCOperation(kCCEncrypt),
+            operation: .encrypt,
             key: newKeys.outboundEncryptionKey.withUnsafeBytes { Array($0) },
             iv: newKeys.initialOutboundIV
         )
         self.inboundCryptor = try CBCCryptor(
-            operation: CCOperation(kCCDecrypt),
+            operation: .decrypt,
             key: newKeys.inboundEncryptionKey.withUnsafeBytes { Array($0) },
             iv: newKeys.initialInboundIV
         )

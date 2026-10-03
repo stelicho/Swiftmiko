@@ -20,9 +20,9 @@ Sources/
 
 There's no package-init file to create — SwiftPM discovers every
 `.swift` file under `Sources/` automatically as part of the
-`Swiftmiko` target (see `Package.swift`; only `CLITools`,
-`CCommonCryptoShim`, and the vendored `swift-nio-ssh` fork are
-excluded, since each of those is its own separate target/package).
+`Swiftmiko` target (see `Package.swift`; only `CLITools` and
+the vendored `swift-nio-ssh` fork are excluded, since each of
+those is its own separate target/package).
 
 ## 2. Subclass the right base class
 

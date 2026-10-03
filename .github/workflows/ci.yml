@@ -1,8 +1,5 @@
 name: CI
 
-# Swiftmiko is macOS-only (SerialChannel uses Darwin termios directly,
-# CCommonCryptoShim links CommonCrypto) — there's no Linux job here on
-# purpose, a Linux build would fail immediately on unrelated grounds.
 on:
   push:
     branches: [main]
@@ -10,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
-    name: Build & Test
+  macos:
+    name: macOS Build & Test
     runs-on: macos-latest
 
     steps:
@@ -41,3 +38,84 @@ jobs:
 
       - name: Test
         run: swift test
+
+  linux:
+    name: Linux Build & Test
+    runs-on: ubuntu-latest
+    # swift-crypto / swift-nio require swift-tools-version 6.1; match the
+    # toolchain used for local development.
+    container: swift:6.1-jammy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        # SerialChannel is Darwin-only (falls back to .notImplemented
+        # elsewhere) and the CLI entrypoints are POSIX-friendly, so the
+        # core library and its test suite are expected to pass as-is.
+        run: swift test
+
+  windows:
+    name: Windows Build & Test
+    runs-on: windows-2022
+    # Swift's official Windows images are Windows *containers*, which GitHub's
+    # `container:` key doesn't drive the same way it does Linux images — so,
+    # mirroring the pattern swift-nio's own CI uses for its Windows jobs
+    # (.github/workflows/swift_matrix.yml upstream), this runs the toolchain
+    # via `docker run` against the workspace mounted as a volume.
+    env:
+      SWIFT_IMAGE: swift:6.1-windowsservercore-ltsc2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Wait for Docker daemon
+        shell: pwsh
+        run: |
+          $maxAttempts = 30
+          $attempt = 0
+          do {
+            $attempt++
+            docker info 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -ge $maxAttempts) {
+              Write-Error "Docker daemon did not become ready after $maxAttempts attempts"
+              exit 1
+            }
+            Start-Sleep -Seconds 6
+          } while ($true)
+
+      - name: Pull Swift Windows image
+        run: docker pull $env:SWIFT_IMAGE
+
+      - name: Build & Test
+        # swift-nio-ssh's CSPRNG previously trapped on Windows at runtime for
+        # every outbound SSH packet (fixed in the vendored fork at
+        # Sources/swift-nio-ssh/Sources/NIOSSH/CSPRNG/CSPRNG.swift) — this job
+        # is what actually exercises that fix.
+        run: |
+          docker run --rm -v ${{ github.workspace }}:C:\source $env:SWIFT_IMAGE cmd /s /c "swift --version && cd C:\source && swift build && swift test"

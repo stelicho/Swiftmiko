@@ -14,7 +14,8 @@
 
 <p align="center">
   A native Swift port of <a href="https://github.com/ktbyers/netmiko">Netmiko</a> —
-  multi-vendor network device SSH/Telnet automation, built for Swift and Apple platforms.
+  multi-vendor network device SSH/Telnet automation, built for Swift.
+  Cross-platform: macOS, iOS, iPadOS, Linux, and Windows.
 </p>
 
 ---
@@ -63,8 +64,13 @@ first tagged release.
 
 ### Requirements
 
-- Xcode 16+ / Swift 5.9+
-- macOS 14+ (for the library target)
+- Swift 6.1+ (the package resolves swift-nio / swift-crypto manifests
+  that require it — `swift --version` to check)
+- The core `Swiftmiko` library and CLI tools build on macOS 14+, iOS 16+,
+  iPadOS 16+, Linux, and Windows
+- Xcode 16+ if you're on an Apple platform, or if you want to run the
+  `Examples/` apps — those are SwiftUI and remain Apple-only even
+  though the library itself isn't
 
 ### Installing
 
