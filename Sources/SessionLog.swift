@@ -53,12 +53,12 @@ private final class FileSessionLogSink: SessionLogSink {
 
     init(path: String, mode: SessionLogMode) throws {
         if mode == .write {
-            FileManager.default.createFile(
+            _ = FileManager.default.createFile(
                 atPath: path,
                 contents: Data()
             )
         } else if !FileManager.default.fileExists(atPath: path) {
-            FileManager.default.createFile(
+            _ = FileManager.default.createFile(
                 atPath: path,
                 contents: Data()
             )

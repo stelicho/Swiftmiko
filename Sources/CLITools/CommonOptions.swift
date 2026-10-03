@@ -136,7 +136,9 @@ func promptSecure(_ prompt: String) -> String {
     var oldTermios = termios()
     tcgetattr(STDIN_FILENO, &oldTermios)
     var newTermios = oldTermios
-    newTermios.c_lflag &= ~UInt(ECHO)
+    // tcflag_t is UInt on Darwin but UInt32 on Linux glibc — cast through
+    // it (not a hardcoded UInt) so this builds on both.
+    newTermios.c_lflag &= ~tcflag_t(ECHO)
     tcsetattr(STDIN_FILENO, TCSANOW, &newTermios)
     defer {
         tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
