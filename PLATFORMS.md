@@ -33,7 +33,7 @@ ported yet.
 
 | Status | Platform |
 |---|---|
-| 🟨 | Cisco IOS |
+| ✅ | Cisco IOS |
 | 🟨 | Cisco IOS-XE |
 | ⬜ | Cisco IOS-XR |
 | ⬜ | Cisco NX-OS |
