@@ -15,6 +15,9 @@
 
 import ArgumentParser
 import Foundation
+#if os(Windows)
+import WinSDK
+#endif
 
 /// Arguments shared by every Swiftmiko CLI tool.
 ///
@@ -128,11 +131,23 @@ extension CommonOptions {
 /// Read a line from stdin without echoing it — the Swift equivalent
 /// of Python's getpass().
 ///
-/// Foundation has no built-in getpass equivalent; this uses termios
-/// directly via Glibc/Darwin to disable echo for the duration of the
-/// read, then restores the terminal's original settings.
+/// Foundation has no built-in getpass equivalent. Windows has no
+/// termios at all (not even via Foundation's implicit re-export), so
+/// this disables echo via the Win32 console API there, and via termios
+/// (Glibc/Darwin, exposed transparently through Foundation) everywhere
+/// else — either way, restoring the terminal's original settings.
 func promptSecure(_ prompt: String) -> String {
     print(prompt, terminator: "")
+#if os(Windows)
+    let handle = GetStdHandle(STD_INPUT_HANDLE)
+    var oldMode: DWORD = 0
+    GetConsoleMode(handle, &oldMode)
+    SetConsoleMode(handle, oldMode & ~DWORD(ENABLE_ECHO_INPUT))
+    defer {
+        SetConsoleMode(handle, oldMode)
+        print()
+    }
+#else
     var oldTermios = termios()
     tcgetattr(STDIN_FILENO, &oldTermios)
     var newTermios = oldTermios
@@ -144,5 +159,6 @@ func promptSecure(_ prompt: String) -> String {
         tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
         print()
     }
+#endif
     return readLine() ?? ""
 }
