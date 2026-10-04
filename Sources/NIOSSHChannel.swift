@@ -273,7 +273,7 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
                 }
             }
             .connectTimeout(.seconds(Int64(profile.connectionTimeout)))
-            .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
 
         let parent: NIOCore.Channel
         do {

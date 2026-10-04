@@ -220,7 +220,7 @@ public final class NIOTelnetChannel: Swiftmiko.Channel, TelnetNegotiatingChannel
                 ch.pipeline.addHandlers([iac, read])
             }
             .connectTimeout(.seconds(Int64(profile.connectionTimeout)))
-            .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
 
         do {
             let ch = try await bootstrap
