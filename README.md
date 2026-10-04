@@ -50,7 +50,7 @@ await connection.disconnect()
 ## Status
 
 **This project is under active development and has not yet been
-verified against real or emulated hardware.** Every driver listed in
+verified against all listed real or emulated hardware.** Every driver listed in
 [`PLATFORMS.md`](./PLATFORMS.md) has been translated from Netmiko's
 Python source and compiles against Swiftmiko's core API, but none has
 been confirmed working end-to-end yet. Testing against GNS3 and real
