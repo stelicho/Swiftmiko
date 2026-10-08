@@ -62,7 +62,7 @@ ported yet.
 
 | Status | Platform |
 |---|---|
-| ⬜ | Generic Linux |
+| ✅ | Generic Linux |
 | ⬜ | Corelight Linux |
 | ⬜ | Cumulus VX Linux |
 | ⬜ | Edgecore SONiC |

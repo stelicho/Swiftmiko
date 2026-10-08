@@ -48,7 +48,7 @@ public struct SwiftmikoBulkEncrypt: ParsableCommand {
         }
 
         let key = try getEncryptionKey()
-        for (deviceName, value) in config {
+        for (deviceName, value) in config where deviceName != "__meta__" {
             guard var params = value as? [String: Any] else { continue }
             if let password = params["password"] as? String {
                 params["password"] = try encryptValue(password, key: key, type: encryptionType)
@@ -58,6 +58,15 @@ public struct SwiftmikoBulkEncrypt: ParsableCommand {
             }
             config[deviceName] = params
         }
+
+        // The file's password/secret fields are now ciphertext — without
+        // this, __meta__.encryption staying false (or missing) means
+        // obtainDevices() skips decryption entirely and hands that
+        // ciphertext to the device as a literal password.
+        var meta = config["__meta__"] as? [String: Any] ?? [:]
+        meta["encryption"] = true
+        meta["encryption_type"] = encryptionType
+        config["__meta__"] = meta
 
         let output = try Yams.dump(object: config)
         if let outputFile {

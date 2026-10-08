@@ -1,0 +1,44 @@
+# Sample inventory for Examples/CLIToolsDemo/README.md.
+#
+# Point SWIFTMIKO_TOOLS_CFG at this file (or copy it to ~/.swiftmiko.yml,
+# the default location) and replace the host/username/password values
+# below with a real device — any of this repo's own Examples apps
+# (C7200Demo, LinuxDemo, OvsDemo, ...) already point at something you
+# can reuse here.
+
+__meta__:
+  encryption: false
+  encryption_type: aes128
+
+router1:
+  device_type: cisco_ios
+  host: 192.168.1.10
+  username: admin
+  password: changeme
+  secret: enablepass
+
+switch1:
+  device_type: arista_eos
+  host: 192.168.1.20
+  username: admin
+  password: changeme
+
+linux1:
+  device_type: linux
+  host: 192.168.1.30
+  username: ubuntu
+  password: changeme
+  # LinuxSSHConnection maps "enable mode" to "sudo -s" — the CLI tools
+  # always try to enter enable mode before running a command (see
+  # Sources/CLITools/SSHConn.swift), so without a sudo password here
+  # (or a user that's already root) this device will fail with "sudo:
+  # a password is required" and land in "Failed devices" rather than
+  # actually running the command as a non-root user.
+  secret: changeme
+
+# A group — "all" is also always available and means every device in
+# the file, with or without a group named "all" defined explicitly.
+lab_devices:
+  - router1
+  - switch1
+  - linux1

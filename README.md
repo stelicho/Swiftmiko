@@ -100,6 +100,11 @@ one out — a browser-based sibling of `CommandRunnerDemo` built with
 Swift package, not an Xcode project: `cd` into it and `swift run`,
 then open `http://localhost:8080`. See its own README for details.
 
+[`CLIToolsDemo`](./Examples/CLIToolsDemo) isn't an app at all — it's a
+walkthrough and sample inventory file for the command-line tools
+already built into the main package (`swiftmiko-show`, `swiftmiko-cfg`,
+`swiftmiko-grep`, `swiftmiko-encrypt`, `swiftmiko-bulk-encrypt`).
+
 ## Documentation
 
 - [`PLATFORMS.md`](./PLATFORMS.md) — full list of supported device

@@ -14,10 +14,10 @@ from the terminal.
 
 Swiftmiko needs a real TCP socket to speak SSH — that only works
 server-side. This is **not** a SwiftWasm/client-side app; it's an
-ordinary server-side Swift process (the kind you'd deploy to a Linux
-box, if Swiftmiko itself were Linux-portable — see "Known
-limitations" below) that happens to render its UI as HTML instead of
-JSON.
+ordinary server-side Swift process — the kind you'd deploy to a Linux
+box, which Swiftmiko itself now actually supports (see the root
+README's platform notes) — that happens to render its UI as HTML
+instead of JSON.
 
 ## Running it
 
@@ -59,8 +59,8 @@ command (or type your own), hit **Run**.
   designed for. The native SwiftUI demo avoids this via
   `isRunning`-gated buttons; this one doesn't have an equivalent guard
   yet.
-- **macOS-only, same as the rest of Swiftmiko.** The core library
-  links Apple's CommonCrypto for its legacy-cipher fallback and isn't
-  Linux-portable today, so this can't actually be deployed to a Linux
-  server despite being an otherwise-ordinary Vapor app. Run it
-  locally via `swift run`.
+- **Untested on Linux, despite Swiftmiko itself supporting it.** This
+  demo's own `Package.swift`/dependencies haven't been exercised there
+  (Vapor does support Linux), so treat "deploy this to a Linux box" as
+  plausible but unverified — the development/testing loop here has
+  only ever been `swift run` on macOS.
