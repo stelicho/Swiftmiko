@@ -47,7 +47,8 @@ extension SSHConnectionStateMachine {
                 role: previous.role,
                 remoteVersion: previous.remoteVersion,
                 protectionSchemes: previous.protectionSchemes,
-                previousSessionIdentifier: self.sessionIdentifier
+                previousSessionIdentifier: self.sessionIdentifier,
+                allowLegacyKeyExchange: previous.role.allowLegacyKeyExchange
             )
         }
 

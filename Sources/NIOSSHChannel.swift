@@ -248,7 +248,7 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
         let bootstrap = ClientBootstrap(group: _swiftmikoNIOGroup)
             .channelInitializer { channel in
                 channel.eventLoop.makeCompletedFuture {
-                    let clientConfiguration: SSHClientConfiguration
+                    var clientConfiguration: SSHClientConfiguration
                     if allowLegacyCiphers {
                         clientConfiguration = SSHClientConfiguration(
                             userAuthDelegate: authDelegate,
@@ -256,6 +256,11 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
                             globalRequestDelegate: nil,
                             transportProtectionSchemes: LegacyTransportProtection.schemesIncludingLegacyCBC
                         )
+                        // Also offer diffie-hellman-group1-sha1 for key exchange —
+                        // some devices old enough to need the legacy CBC ciphers
+                        // above (e.g. 2010-era Cisco IOS mainline) support no
+                        // other classic DH group at all, not even group14.
+                        clientConfiguration.allowLegacyKeyExchange = true
                     } else {
                         clientConfiguration = SSHClientConfiguration(
                             userAuthDelegate: authDelegate,

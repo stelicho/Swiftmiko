@@ -1,15 +1,33 @@
 //===----------------------------------------------------------------------===//
 //
 // Fork addition (not part of upstream swift-nio-ssh): classic finite-field
-// Diffie-Hellman key exchange (RFC 4253 §8, group14-sha1 / RFC 3526 §3),
-// for SSH servers too old to offer ECDH or Curve25519 — e.g. classic Cisco
-// IOS on hardware like a C7200. Upstream swift-nio-ssh only implements
-// elliptic-curve KEX; this fills the gap using the same
-// EllipticCurveKeyExchangeProtocol extension point (the wire messages for
-// SSH_MSG_KEXDH_INIT/REPLY happen to share message IDs 30/31 with
-// SSH_MSG_KEX_ECDH_INIT/REPLY and are encoded identically as length-prefixed
-// byte strings, so KeyExchangeECDHInitMessage/KeyExchangeECDHReplyMessage
-// and their wire encoding are reused as-is).
+// Diffie-Hellman key exchange (RFC 4253 §8), for SSH servers too old to
+// offer ECDH or Curve25519 — e.g. classic Cisco IOS on hardware like a
+// C7200. Upstream swift-nio-ssh only implements elliptic-curve KEX; this
+// fills the gap using the same EllipticCurveKeyExchangeProtocol extension
+// point (the wire messages for SSH_MSG_KEXDH_INIT/REPLY happen to share
+// message IDs 30/31 with SSH_MSG_KEX_ECDH_INIT/REPLY and are encoded
+// identically as length-prefixed byte strings, so
+// KeyExchangeECDHInitMessage/KeyExchangeECDHReplyMessage and their wire
+// encoding are reused as-is).
+//
+// Two groups are implemented, both gated by `allowLegacyKeyExchange`
+// (wired through SSHClientConfiguration/SSHConnectionRole) except where
+// noted:
+//   - diffie-hellman-group14-sha1 (RFC 3526 §3, 2048-bit MODP): always
+//     offered, confirmed empirically against a real Cisco IOS device.
+//   - diffie-hellman-group1-sha1 (RFC 4253 §8.1, RFC 2409 §6.2, 1024-bit
+//     MODP): opt-in only, since 1024-bit DH is considered weak by modern
+//     standards. Despite the name, this is Oakley *Group 2* from RFC 2409
+//     — RFC 4253 §8.1 explicitly says so ("Oakley Group 2 ... (1024-bit
+//     MODP Group)"); SSH's "group1" numbering refers to it being the
+//     first classic DH method RFC 4253 defines, not to Oakley's own
+//     numbering. Some SSH implementations' comments (including an earlier
+//     version of this one) describe it as 768-bit, which is Oakley Group
+//     1 — a different, smaller prime that SSH never actually uses.
+//   diffie-hellman-group-exchange-sha1 (server-negotiated group size) is
+//   not implemented: it adds an extra round trip for no benefit over the
+//   two fixed groups above.
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,7 +47,12 @@ import Foundation
 /// exponentiation. Not general-purpose, not constant-time, not optimized —
 /// correctness and auditability over speed, since this runs once per SSH
 /// connection setup, not in a hot loop.
-private struct BigUInt {
+// Module-internal (not file-private): SSHKeyExchangeStateMachine.swift
+// needs to name DiffieHellmanGroup14/DiffieHellmanGroup1 as generic
+// arguments to ClassicDiffieHellmanKeyExchange when registering them —
+// see the access-level note on DiffieHellmanGroup below. Still not part
+// of NIOSSH's public API.
+struct BigUInt {
     /// Little-endian 32-bit limbs. Always normalized: no trailing (high-order)
     /// zero limbs, except that zero itself is represented as an empty array.
     var limbs: [UInt32]
@@ -283,9 +306,29 @@ private struct BigUInt {
 
 extension BigUInt: Equatable {}
 
+// MARK: - Classic DH group abstraction
+
+/// A fixed finite-field Diffie-Hellman group: a prime, a generator, and the
+/// precomputed Barrett reduction constants for that prime. Lets
+/// `ClassicDiffieHellmanKeyExchange` be generic over which fixed group it
+/// uses, so the modexp/hashing/key-derivation machinery (identical for
+/// every classic DH group) is written once.
+// Module-internal, not private: registered by name from
+// SSHKeyExchangeStateMachine.swift (a different file).
+protocol DiffieHellmanGroup {
+    static var shared: Self { get }
+    var prime: BigUInt { get }
+    var generator: BigUInt { get }
+    var mu: BigUInt { get }
+    var k: Int { get }
+
+    /// The SSH KEX algorithm name this group is offered under.
+    static var keyExchangeAlgorithmName: Substring { get }
+}
+
 // MARK: - RFC 3526 §3 2048-bit MODP Group (Group 14)
 
-private struct DiffieHellmanGroup14 {
+struct DiffieHellmanGroup14: DiffieHellmanGroup {
     let prime: BigUInt
     let generator: BigUInt
     /// Barrett reduction constant for `prime`: `floor(2^(64*k) / prime)`,
@@ -297,6 +340,8 @@ private struct DiffieHellmanGroup14 {
     /// modulus that never changes.
     let mu: BigUInt
     let k: Int
+
+    static var keyExchangeAlgorithmName: Substring { "diffie-hellman-group14-sha1" }
 
     static let shared: DiffieHellmanGroup14 = {
         // RFC 3526 §3, transcribed line-for-line so it stays checkable
@@ -342,16 +387,68 @@ private struct DiffieHellmanGroup14 {
     }()
 }
 
+// MARK: - RFC 2409 §6.2 1024-bit MODP Group ("diffie-hellman-group1-sha1")
+
+struct DiffieHellmanGroup1: DiffieHellmanGroup {
+    let prime: BigUInt
+    let generator: BigUInt
+    /// Barrett reduction constant for `prime`: `floor(2^(64*k) / prime)`,
+    /// `k` = 32 (limb count for a 1024-bit modulus with 32-bit limbs).
+    /// Same derivation method as `DiffieHellmanGroup14.mu` — see there.
+    let mu: BigUInt
+    let k: Int
+
+    static var keyExchangeAlgorithmName: Substring { "diffie-hellman-group1-sha1" }
+
+    static let shared: DiffieHellmanGroup1 = {
+        // RFC 2409 §6.2 ("Second Oakley Group"), transcribed line-for-line
+        // against the RFC text, each line one of its published 48-hex-digit
+        // groups except the last (32 digits) — same layout as Group 14's
+        // transcription above. Note this prime's leading 768 bits are
+        // bit-for-bit identical to Group 14's leading 768 bits: RFC 3526's
+        // larger MODP groups were constructed by extending this exact
+        // 1024-bit prime's digit stream, so the shared prefix is expected,
+        // not a coincidence — a useful cross-check of both transcriptions.
+        let primeHex =
+            "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
+            + "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
+            + "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
+            + "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
+            + "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381"
+            + "FFFFFFFFFFFFFFFF"
+        let prime = BigUInt(hexString: primeHex)
+        // Sanity check against transcription errors: the group 1 prime is
+        // exactly 1024 bits and odd.
+        precondition(prime.bitWidth == 1024, "diffie-hellman-group1-sha1 prime is malformed")
+        precondition(prime.testBit(0), "diffie-hellman-group1-sha1 prime must be odd")
+
+        // floor(2^2048 / prime), computed via:
+        //   python3 -c "p = int('<primeHex>', 16); print(format((1 << 2048) // p, '0257X'))"
+        let muHex =
+            "1000000000000000036F0255DDE973DCB4703CE7E2E815197A"
+            + "6DB0F588448B61164CFCAC5F1872E51B1F9FBB5BF16FBE7968"
+            + "9FC0903A801E3D4802FB8D329550DC8C9D3D922EECE9A5475D"
+            + "B33DB7B83BB5C0E13D168049BBC86C5817647B088D17AA5CC4"
+            + "0E02035588EDB2DE18993413719FC258D79BA293686B8F055"
+            + "60031F42"
+        let mu = BigUInt(hexString: muHex)
+        // mu must satisfy mu*prime <= 2^2048 < (mu+1)*prime.
+        precondition(mu.bitWidth == 1025, "group1 Barrett constant is malformed")
+
+        return DiffieHellmanGroup1(prime: prime, generator: BigUInt(2), mu: mu, k: 32)
+    }()
+}
+
 // MARK: - Classic Diffie-Hellman key exchange
 
 /// Implements RFC 4253 §8's classic (finite-field) Diffie-Hellman key
-/// exchange, restricted to group14-sha1: the fixed 2048-bit MODP group
-/// from RFC 3526 §3, with a SHA-1 exchange hash. This is the only classic
-/// DH variant this fork adds — diffie-hellman-group1-sha1 (768-bit, broken)
-/// is deliberately not implemented, and diffie-hellman-group-exchange-sha1
-/// (server-negotiated group size) adds an extra round trip for no security
-/// benefit over the fixed group14 group.
-struct ClassicDiffieHellmanKeyExchange: EllipticCurveKeyExchangeProtocol {
+/// exchange against a fixed group, with a SHA-1 exchange hash. Generic
+/// over `Group` so the same modexp/hashing/key-derivation logic serves
+/// both `diffie-hellman-group14-sha1` and `diffie-hellman-group1-sha1`
+/// (see the two `DiffieHellmanGroup` conformances above) — see the
+/// fork-addition comment at the top of this file for which is offered
+/// when.
+struct ClassicDiffieHellmanKeyExchange<Group: DiffieHellmanGroup>: EllipticCurveKeyExchangeProtocol {
     private var previousSessionIdentifier: ByteBuffer?
     private var ourRole: SSHConnectionRole
     private var privateExponent: BigUInt
@@ -363,16 +460,16 @@ struct ClassicDiffieHellmanKeyExchange: EllipticCurveKeyExchangeProtocol {
         self.previousSessionIdentifier = previousSessionIdentifier
         self.privateExponent = Self.generatePrivateExponent()
         self.ourPublicValue = BigUInt.modPow(
-            base: DiffieHellmanGroup14.shared.generator,
+            base: Group.shared.generator,
             exponent: self.privateExponent,
-            modulus: DiffieHellmanGroup14.shared.prime,
-            mu: DiffieHellmanGroup14.shared.mu,
-            k: DiffieHellmanGroup14.shared.k
+            modulus: Group.shared.prime,
+            mu: Group.shared.mu,
+            k: Group.shared.k
         )
     }
 
     static var keyExchangeAlgorithmNames: [Substring] {
-        ["diffie-hellman-group14-sha1"]
+        [Group.keyExchangeAlgorithmName]
     }
 
     /// A private exponent this size gives the conventional ~2x security
@@ -459,10 +556,10 @@ struct ClassicDiffieHellmanKeyExchange: EllipticCurveKeyExchangeProtocol {
         // RFC 2631 §2.1.5-style range check: reject the trivial/degenerate
         // values 0, 1, and p-1, which would let a malicious peer force a
         // predictable shared secret (small-subgroup-style confinement).
-        let prime = DiffieHellmanGroup14.shared.prime
+        let prime = Group.shared.prime
         guard theirValue < prime, BigUInt(1) < theirValue, theirValue != prime - BigUInt(1) else {
             throw NIOSSHError.invalidSSHMessage(
-                reason: "diffie-hellman-group14-sha1 peer public value out of range"
+                reason: "\(Group.keyExchangeAlgorithmName) peer public value out of range"
             )
         }
         self.theirPublicValue = theirValue
@@ -471,8 +568,8 @@ struct ClassicDiffieHellmanKeyExchange: EllipticCurveKeyExchangeProtocol {
             base: theirValue,
             exponent: self.privateExponent,
             modulus: prime,
-            mu: DiffieHellmanGroup14.shared.mu,
-            k: DiffieHellmanGroup14.shared.k
+            mu: Group.shared.mu,
+            k: Group.shared.k
         )
 
         initialExchangeBytes.writeCompositeSSHString { $0.writeSSHHostKey(serverHostKey) }

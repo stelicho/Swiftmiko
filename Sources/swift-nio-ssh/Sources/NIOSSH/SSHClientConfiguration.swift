@@ -26,6 +26,15 @@ public struct SSHClientConfiguration {
     /// Supported data encryption algorithms
     public var transportProtectionSchemes: [NIOSSHTransportProtection.Type]
 
+    /// Fork addition: whether to additionally offer `diffie-hellman-group1-sha1`
+    /// for key exchange, for servers too old to support even
+    /// `diffie-hellman-group14-sha1` (which this fork always offers — see
+    /// ClassicDiffieHellmanKeyExchange.swift). Defaults to `false`: despite
+    /// the name, `group1-sha1` is RFC 4253's "Oakley Group 2" (1024-bit
+    /// MODP), weak by modern standards, so it's opt-in only — mirroring
+    /// this type's existing posture on weak ciphers.
+    public var allowLegacyKeyExchange: Bool = false
+
     /// The maximum size, in bytes, of a channel data payload this peer is willing to receive (the
     /// "maximum packet size" of an SSH channel, RFC 4254 §5.1). It is advertised to the remote peer
     /// when opening channels and bounds inbound encrypted packets. Defaults to `1 << 17` (128 KiB).

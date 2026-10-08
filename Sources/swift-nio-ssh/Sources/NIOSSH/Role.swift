@@ -47,6 +47,20 @@ public enum SSHConnectionRole {
         }
     }
 
+    /// Fork addition: whether to additionally offer diffie-hellman-group1-sha1
+    /// (see SSHClientConfiguration.allowLegacyKeyExchange). Server-side has no
+    /// consumer in this fork's use case (Swiftmiko is client-only), so it's
+    /// hardcoded off rather than adding the same opt-in to
+    /// SSHServerConfiguration for no current benefit.
+    internal var allowLegacyKeyExchange: Bool {
+        switch self {
+        case .client(let configuration):
+            return configuration.allowLegacyKeyExchange
+        case .server:
+            return false
+        }
+    }
+
     /// The maximum size of a channel data payload this peer advertises it is willing to receive,
     /// and against which inbound encrypted packets are bounded.
     internal var maximumPacketSize: UInt32 {

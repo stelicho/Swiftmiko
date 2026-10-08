@@ -92,6 +92,11 @@ struct SSHKeyExchangeStateMachine {
     private var initialExchangeBytes: ByteBuffer
     private var protectionSchemes: [NIOSSHTransportProtection.Type]
     private var previousSessionIdentifier: ByteBuffer?
+    // Fork addition: whether diffie-hellman-group1-sha1 (1024-bit, weak by
+    // modern standards) is additionally offered, for servers too old to
+    // support even group14 — see ClassicDiffieHellmanKeyExchange.swift.
+    // Opt-in, mirroring allowLegacyCiphers's posture on weak ciphers.
+    private let allowLegacyKeyExchange: Bool
 
     init(
         allocator: ByteBufferAllocator,
@@ -99,7 +104,8 @@ struct SSHKeyExchangeStateMachine {
         role: SSHConnectionRole,
         remoteVersion: String,
         protectionSchemes: [NIOSSHTransportProtection.Type],
-        previousSessionIdentifier: ByteBuffer?
+        previousSessionIdentifier: ByteBuffer?,
+        allowLegacyKeyExchange: Bool = false
     ) {
         self.allocator = allocator
         self.loop = loop
@@ -108,6 +114,7 @@ struct SSHKeyExchangeStateMachine {
         self.state = .idle
         self.protectionSchemes = protectionSchemes
         self.previousSessionIdentifier = previousSessionIdentifier
+        self.allowLegacyKeyExchange = allowLegacyKeyExchange
 
         switch self.role {
         case .client:
@@ -129,7 +136,7 @@ struct SSHKeyExchangeStateMachine {
 
         return .init(
             cookie: rng.randomCookie(allocator: self.allocator),
-            keyExchangeAlgorithms: Self.supportedKeyExchangeAlgorithms,
+            keyExchangeAlgorithms: self.keyExchangeAlgorithms,
             serverHostKeyAlgorithms: self.supportedHostKeyAlgorithms,
             encryptionAlgorithmsClientToServer: encryptionAlgorithms,
             encryptionAlgorithmsServerToClient: encryptionAlgorithms,
@@ -451,13 +458,13 @@ struct SSHKeyExchangeStateMachine {
 
         switch self.role {
         case .client:
-            clientAlgorithms = Self.supportedKeyExchangeAlgorithms
+            clientAlgorithms = self.keyExchangeAlgorithms
             serverAlgorithms = peerKeyExchangeAlgorithms
             clientHostKeyAlgorithms = self.supportedHostKeyAlgorithms
             serverHostKeyAlgorithms = peerHostKeyAlgorithms
         case .server:
             clientAlgorithms = peerKeyExchangeAlgorithms
-            serverAlgorithms = Self.supportedKeyExchangeAlgorithms
+            serverAlgorithms = self.keyExchangeAlgorithms
             clientHostKeyAlgorithms = peerHostKeyAlgorithms
             serverHostKeyAlgorithms = self.supportedHostKeyAlgorithms
         }
@@ -537,7 +544,7 @@ struct SSHKeyExchangeStateMachine {
     }
 
     private func exchangerForAlgorithm(_ algorithm: Substring) throws -> EllipticCurveKeyExchangeProtocol {
-        for implementation in Self.supportedKeyExchangeImplementations {
+        for implementation in self.keyExchangeImplementations {
             if implementation.keyExchangeAlgorithmNames.contains(algorithm) {
                 return implementation.init(
                     ourRole: self.role,
@@ -553,7 +560,7 @@ struct SSHKeyExchangeStateMachine {
     private func expectingIncorrectGuess(_ kexMessage: SSHMessage.KeyExchangeMessage) -> Bool {
         // A guess is wrong if the key exchange algorithm and/or the host key algorithm differ from our preference.
         kexMessage.firstKexPacketFollows
-            && (kexMessage.keyExchangeAlgorithms.first != Self.supportedKeyExchangeAlgorithms.first
+            && (kexMessage.keyExchangeAlgorithms.first != self.keyExchangeAlgorithms.first
                 || kexMessage.serverHostKeyAlgorithms.first != self.supportedHostKeyAlgorithms.first)
     }
 
@@ -588,8 +595,8 @@ struct SSHKeyExchangeStateMachine {
 }
 
 extension SSHKeyExchangeStateMachine {
-    // For now this is a static list.
-    static let supportedKeyExchangeImplementations: [EllipticCurveKeyExchangeProtocol.Type] = [
+    // Base list, always offered. For now this part is static.
+    static let baseKeyExchangeImplementations: [EllipticCurveKeyExchangeProtocol.Type] = [
         EllipticCurveKeyExchange<P384.KeyAgreement.PrivateKey>.self,
         EllipticCurveKeyExchange<P256.KeyAgreement.PrivateKey>.self,
         EllipticCurveKeyExchange<P521.KeyAgreement.PrivateKey>.self,
@@ -598,11 +605,23 @@ extension SSHKeyExchangeStateMachine {
         // or Curve25519 (see ClassicDiffieHellmanKeyExchange.swift). Listed
         // last so modern methods are always preferred when both sides
         // support them.
-        ClassicDiffieHellmanKeyExchange.self,
+        ClassicDiffieHellmanKeyExchange<DiffieHellmanGroup14>.self,
     ]
 
-    static let supportedKeyExchangeAlgorithms: [Substring] = supportedKeyExchangeImplementations.flatMap {
-        $0.keyExchangeAlgorithmNames
+    // Fork addition: diffie-hellman-group1-sha1, appended only when
+    // `allowLegacyKeyExchange` opts in — see the property's doc comment.
+    private var keyExchangeImplementations: [EllipticCurveKeyExchangeProtocol.Type] {
+        if self.allowLegacyKeyExchange {
+            return Self.baseKeyExchangeImplementations + [ClassicDiffieHellmanKeyExchange<DiffieHellmanGroup1>.self]
+        } else {
+            return Self.baseKeyExchangeImplementations
+        }
+    }
+
+    private var keyExchangeAlgorithms: [Substring] {
+        self.keyExchangeImplementations.flatMap {
+            $0.keyExchangeAlgorithmNames
+        }
     }
 
     /// All known host key algorithms.

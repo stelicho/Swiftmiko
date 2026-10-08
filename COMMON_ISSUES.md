@@ -104,6 +104,31 @@ swift-crypto's `_CryptoExtras` module (see
 defaults to `false` — leave it off for anything but lab/EOL gear you
 control.
 
+### Connecting to a 2010-era device fails immediately with "Unexpected end of file"
+
+This is a different failure from the one above: the connection dies
+right after key exchange starts, before any cipher is negotiated at
+all. Devices old enough to predate `diffie-hellman-group14-sha1`
+support (some mainline Cisco IOS 12.4 images from 2010 or so, for
+example) only offer `diffie-hellman-group1-sha1` for key exchange —
+despite the name, this is RFC 4253's "Oakley Group 2" (1024-bit MODP),
+not the smaller 768-bit "Oakley Group 1" some tooling's comments
+(including an earlier version of this project's) describe it as. It's
+weak by modern standards, so — like the CBC cipher fallback above —
+it's opt-in only, and the *same* `allowLegacyCiphers` flag covers both:
+
+```swift
+var profile = ConnectionProfile(/* ... */)
+profile.allowLegacyCiphers = true
+```
+
+`ssh -vv` straight at the device (with `-oKexAlgorithms=`,
+`-oHostKeyAlgorithms=`, and `-oCiphers=` overridden to include the old
+algorithms) is the fastest way to confirm what a given device actually
+offers before assuming this is the cause — see
+`Sources/swift-nio-ssh/Sources/NIOSSH/Key Exchange/ClassicDiffieHellmanKeyExchange.swift`
+for the implementation.
+
 ### Encryption: Fernet isn't implemented
 
 `.swiftmiko.yml`'s `__meta__.encryption_type` accepts `fernet`, but
