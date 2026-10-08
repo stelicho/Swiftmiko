@@ -9,20 +9,26 @@
 // Usage: swift run (from this directory), then follow the prompts.
 //
 // An explicit `@main` entry point rather than bare top-level
-// statements (which is why this file isn't named main.swift — Swift
-// doesn't allow `@main` there): literal top-level code in a
-// `main.swift` file is implicitly @MainActor-isolated, but
-// SSHDispatcher.connectHandler is nonisolated and returns
-// BaseConnection, a plain (non-Sendable) class — crossing from
-// MainActor-isolated top-level code into that nonisolated async call
-// and back requires Sendable, which BaseConnection isn't. `main()`
-// below has no actor annotation, so it's nonisolated like
-// connectHandler itself: everything from connecting through the
-// command loop to disconnecting stays in one isolation domain, with
-// no boundary crossing at all.
+// statements — partly for clarity, partly because this file isn't
+// named main.swift, which `@main` requires.
+//
+// If you're hunting for why `SSHDispatcher.connectHandler`'s result
+// (a `BaseConnection`, not `Sendable`) doesn't trip a Swift 6
+// complete-concurrency error here: the real fix lives in
+// `Package.swift` (`swiftSettings: [.swiftLanguageMode(.v5)]`), not
+// here. This package declares swift-tools-version 6.1, which turns on
+// complete-concurrency checking by default, but Swiftmiko itself is
+// swift-tools-version 5.9 and hasn't been concurrency-audited —
+// pinning this target to Swift 5 language mode sidesteps that
+// entirely, the same way every other Examples/ app already does
+// without realizing it (their Xcode projects default to
+// `SWIFT_VERSION = 5.0`). The `@preconcurrency` on the import below is
+// a secondary, complementary measure, not the actual fix — don't
+// remove the `swiftLanguageMode(.v5)` setting and expect this alone to
+// cover it.
 
 import Foundation
-import Swiftmiko
+@preconcurrency import Swiftmiko
 
 #if canImport(Darwin)
 import Darwin
