@@ -90,9 +90,9 @@ repository URL.
 The `Examples/` directory contains several small SwiftUI apps
 demonstrating real usage against real devices — a VLAN viewer, an
 enable-mode demo, a running-config fetcher, a multi-vendor command
-runner, and an Open vSwitch topology browser. Each is its own Xcode
-target; open `Swiftmiko.xcworkspace` (or the project directly) and
-switch schemes to try one.
+runner, a generic Linux SSH demo, and an Open vSwitch topology browser.
+Each is its own Xcode target; open `Swiftmiko.xcworkspace` (or the
+project directly) and switch schemes to try one.
 
 [`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
 one out — a browser-based sibling of `CommandRunnerDemo` built with

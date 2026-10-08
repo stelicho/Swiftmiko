@@ -1,21 +1,21 @@
-// Examples/OvsDemo/OvsViewModel.swift
+// Examples/LinuxDemo/LinuxViewModel.swift
 import Combine
 import Foundation
 import Swiftmiko
 
 @MainActor
-final class OvsViewModel: ObservableObject {
+final class LinuxViewModel: ObservableObject {
     @Published var host = ""
     @Published var username = ""
     @Published var password = ""
 
-    /// OVS hosts are just Linux boxes — "enable mode" here is
-    /// sudo, and this doubles as the sudo password. LinuxSSHConnection
-    /// maps enterConfigMode() to "sudo -s" internally.
+    /// A plain Linux box has no "enable mode" — sudo is the closest
+    /// equivalent, and LinuxSSHConnection maps enterConfigMode() to
+    /// "sudo -s" internally. Leave empty for a VM with no sudo password
+    /// (e.g. passwordless sudo, or testing as a non-privileged user).
     @Published var sudoPassword = ""
 
-    @Published var bridges: [OvsBridge] = []
-    @Published var selectedCommand: OvsCommand = OvsCommand.library[0]
+    @Published var selectedCommand: LinuxCommand = LinuxCommand.library[0]
     @Published var customCommand = ""
     @Published var useCustomCommand = false
 
@@ -44,7 +44,7 @@ final class OvsViewModel: ObservableObject {
         do {
             let profile = ConnectionProfile(
                 host: host,
-                deviceType: "ovs_linux",
+                deviceType: "linux",
                 username: username,
                 auth: .password(password),
                 secret: sudoPassword.isEmpty ? nil : sudoPassword,
@@ -52,14 +52,12 @@ final class OvsViewModel: ObservableObject {
             )
 
             // SSHDispatcher.connectHandler wires in the NIOSSH channel
-            // provider registered for "ovs_linux" and connects — building
-            // OvsLinuxSSH directly instead leaves channelProvider nil,
-            // which throws "No channel or channel provider was supplied".
+            // provider registered for "linux" and connects.
             let newConnection = try await SSHDispatcher.connectHandler(profile: profile)
 
-            // Escalate to root, needed for most ovs-vsctl/ovs-ofctl
-            // commands. On LinuxSSHConnection this is "sudo -s", not
-            // a Cisco-style "enable".
+            // Escalate to root via "sudo -s" if a sudo password was given.
+            // Most distros' default user can already run plenty of
+            // diagnostics without this, so it's optional here.
             if !sudoPassword.isEmpty {
                 try await newConnection.enterConfigMode()
             }
@@ -90,29 +88,9 @@ final class OvsViewModel: ObservableObject {
         }
     }
 
-    func fetchTopology() async {
-        guard let connection else {
-            errorMessage = "Not connected — press Connect first."
-            return
-        }
-
-        errorMessage = nil
-        isRunning = true
-        defer { isRunning = false }
-
-        do {
-            let raw = try await connection.sendCommand("ovs-vsctl show", readTimeout: 20.0)
-            output = raw
-            bridges = OvsVsctlShowParser.parse(raw)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func disconnect() async {
         await connection?.disconnect()
         connection = nil
         output = ""
-        bridges = []
     }
 }
