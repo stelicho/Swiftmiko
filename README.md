@@ -90,7 +90,8 @@ repository URL.
 The `Examples/` directory contains several small SwiftUI apps
 demonstrating real usage against real devices — a VLAN viewer, an
 enable-mode demo, a running-config fetcher, a multi-vendor command
-runner, a generic Linux SSH demo, and an Open vSwitch topology browser.
+runner, a generic Linux SSH demo, a Ubiquiti command runner (UniFi
+Switch, EdgeSwitch, EdgeRouter), and an Open vSwitch topology browser.
 Each is its own Xcode target; open `Swiftmiko.xcworkspace` (or the
 project directly) and switch schemes to try one.
 
@@ -99,6 +100,13 @@ one out — a browser-based sibling of `CommandRunnerDemo` built with
 [Vapor](https://vapor.codes) instead of SwiftUI. It's a standalone
 Swift package, not an Xcode project: `cd` into it and `swift run`,
 then open `http://localhost:8080`. See its own README for details.
+
+[`CommandRunnerTerminalDemo`](./Examples/CommandRunnerTerminalDemo) is
+another standalone package, not an Xcode project — a plain terminal
+version of the same idea with no SwiftUI and no web framework, just
+`Foundation` and `Swiftmiko`. It's the one example in this directory
+that actually builds and runs on Linux and Windows too, not just
+macOS — CI builds it on all three.
 
 [`CLIToolsDemo`](./Examples/CLIToolsDemo) isn't an app at all — it's a
 walkthrough and sample inventory file for the command-line tools

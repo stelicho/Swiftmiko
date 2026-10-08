@@ -70,6 +70,14 @@ jobs:
         # core library and its test suite are expected to pass as-is.
         run: swift test
 
+      - name: Build CommandRunnerTerminalDemo
+        # The one Examples/ app that's actually meant to run on Linux —
+        # see its own README for why. Everything else under Examples/
+        # is either an Xcode project (macOS/iOS-only tooling, not buildable
+        # here) or CommandRunnerWebDemo (Vapor — untested on Linux by choice,
+        # see its README).
+        run: cd Examples/CommandRunnerTerminalDemo && swift build
+
   windows:
     name: Windows Build & Test
     runs-on: windows-2022
@@ -116,6 +124,8 @@ jobs:
         # swift-nio-ssh's CSPRNG previously trapped on Windows at runtime for
         # every outbound SSH packet (fixed in the vendored fork at
         # Sources/swift-nio-ssh/Sources/NIOSSH/CSPRNG/CSPRNG.swift) — this job
-        # is what actually exercises that fix.
+        # is what actually exercises that fix. The final step also builds
+        # Examples/CommandRunnerTerminalDemo, the one Examples/ app meant to
+        # run on Windows too — see its own README.
         run: |
-          docker run --rm -v ${{ github.workspace }}:C:\source $env:SWIFT_IMAGE cmd /s /c "swift --version && cd C:\source && swift build && swift test"
+          docker run --rm -v ${{ github.workspace }}:C:\source $env:SWIFT_IMAGE cmd /s /c "swift --version && cd C:\source && swift build && swift test && cd Examples\CommandRunnerTerminalDemo && swift build"
