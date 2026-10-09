@@ -127,5 +127,14 @@ jobs:
         # is what actually exercises that fix. The final step also builds
         # Examples/CommandRunnerTerminalDemo, the one Examples/ app meant to
         # run on Windows too — see its own README.
+        #
+        # Mounted at C:\Swiftmiko, not C:\source: SwiftPM derives a local
+        # path dependency's package identity from the directory's basename,
+        # not its declared `name:` (and path dependencies don't support a
+        # name override at this tools-version). CommandRunnerTerminalDemo's
+        # `.package(path: "../../")` + `.product(package: "Swiftmiko")`
+        # needs that basename to actually be "Swiftmiko", or resolution
+        # fails with "unknown package 'Swiftmiko'; valid packages are:
+        # '<mount-dirname>'" — confirmed by hitting exactly that error here.
         run: |
-          docker run --rm -v ${{ github.workspace }}:C:\source $env:SWIFT_IMAGE cmd /s /c "swift --version && cd C:\source && swift build && swift test && cd Examples\CommandRunnerTerminalDemo && swift build"
+          docker run --rm -v ${{ github.workspace }}:C:\Swiftmiko $env:SWIFT_IMAGE cmd /s /c "swift --version && cd C:\Swiftmiko && swift build && swift test && cd Examples\CommandRunnerTerminalDemo && swift build"
