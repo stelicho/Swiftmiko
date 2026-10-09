@@ -95,6 +95,24 @@ Switch, EdgeSwitch, EdgeRouter), and an Open vSwitch topology browser.
 Each is its own Xcode target; open `Swiftmiko.xcworkspace` (or the
 project directly) and switch schemes to try one.
 
+Four more focus on a single driver's own idiosyncrasies rather than
+generic command-running:
+[`JuniperDemo`](./Examples/JuniperDemo) drives JunOS's candidate-config
+commit workflow (plain/confirmed/check-only/commented commits, discard
+on exit);
+[`NokiaDemo`](./Examples/NokiaDemo) detects and surfaces SR OS's two
+CLI dialects (classical vs. model-driven) and their different
+config/commit behavior;
+[`MikrotikDemo`](./Examples/MikrotikDemo) connects to RouterOS, whose
+driver smuggles terminal settings into the SSH username itself and
+absorbs several possible post-login prompts before `connect()` returns;
+[`PaloAltoDemo`](./Examples/PaloAltoDemo) drives PAN-OS's partial-commit
+scoping (device-and-network / policy-and-objects / vsys / no-vsys) —
+and calls out a real gap along the way: PAN-OS's usual
+keyboard-interactive SSH auth isn't wired into Swiftmiko's transport
+yet, so this demo only works against gear that still accepts plain
+password auth as a fallback.
+
 [`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
 one out — a browser-based sibling of `CommandRunnerDemo` built with
 [Vapor](https://vapor.codes) instead of SwiftUI. It's a standalone
