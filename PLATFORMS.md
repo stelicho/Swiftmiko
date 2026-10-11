@@ -56,7 +56,7 @@ ported yet.
 
 | Status | Platform |
 |---|---|
-| ⬜ | Arista vEOS |
+| 🟨 | Arista vEOS |
 
 ### Linux-Family
 
