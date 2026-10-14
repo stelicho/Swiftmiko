@@ -118,7 +118,7 @@ ported yet.
 | Status | Platform |
 |---|---|
 | ⬜ | Nokia/Alcatel SR OS |
-| ⬜ | Nokia SR Linux |
+| 🟨 | Nokia SR Linux |
 | ⬜ | Alcatel AOS6/AOS8 |
 
 ### Fortinet / Palo Alto / Check Point / Watchguard
