@@ -88,16 +88,21 @@ public actor DispatcherRegistry {
 /// Default Swiftmiko dispatcher entries.
 ///
 /// Covers every vendor driver ported under `Sources/` (see `PLATFORMS.md`),
-/// not just the Cisco family that was originally wired up here. A small
-/// number of `deviceType` strings from `PLATFORMS.md` are intentionally
-/// left unregistered below because no corresponding Swift class exists
-/// yet (e.g. `huawei_olt`, `fiberstore_fsosv2`, `brocade_vyos`) — that's a
-/// missing driver, not a missing registration, and forcing a guess would
-/// be worse than leaving it absent. A handful of others are registered
-/// as a *best-effort alias* to the closest existing driver where Netmiko
-/// itself is known to alias multiple `deviceType` strings to one class
-/// (rebrand/acquisition pairs like Avaya/Extreme, HP/Aruba ProCurve,
-/// Alcatel/Nokia SR OS); those are called out inline.
+/// not just the Cisco family that was originally wired up here, plus every
+/// `deviceType` string from `PLATFORMS.md` that Netmiko itself maps to an
+/// *existing* class rather than a genuinely distinct one. Those are
+/// registered below as a best-effort alias to the closest existing
+/// driver, exactly mirroring Netmiko's own `CLASS_MAPPER` (rebrand/
+/// acquisition pairs like Avaya/Extreme, HP/Aruba ProCurve, Alcatel/
+/// Nokia SR OS, Cisco S300/S500, Brocade VyOS, Huawei OLT→SmartAX);
+/// those are called out inline. `huawei_olt_telnet` in particular
+/// mirrors a real Netmiko quirk: it maps to the plain SSH class, not a
+/// Telnet one, because no dedicated SmartAX Telnet class exists
+/// upstream either — preserved as-is rather than "fixed." `fiberstore_fsosv2`
+/// looked like it might belong in this same alias bucket but is
+/// actually Netmiko's own distinct class — ported as its own Swift
+/// class (`FiberstoreFsosV2SSH`/`FiberstoreFsosV2Telnet`) alongside the
+/// original `FiberstoreFsosSSH` rather than aliased.
 ///
 /// Every vendor leaf class below accepts `channelProvider` (forwarded
 /// from its custom `init(profile:...)` through to `BaseConnection`, the
@@ -148,6 +153,9 @@ public enum SSHDispatcher {
         "cisco_s200_telnet": { CiscoS200Telnet(profile: $0, channelProvider: nioTelnetChannelProvider) },
         "cisco_s300": { CiscoS300SSH(profile: $0, channelProvider: nioSSHChannelProvider) },
         "cisco_s300_telnet": { CiscoS300Telnet(profile: $0, channelProvider: nioTelnetChannelProvider) },
+        // Cisco S500 reuses the S300 driver in Netmiko — no dedicated class.
+        "cisco_s500": { CiscoS300SSH(profile: $0, channelProvider: nioSSHChannelProvider) },
+        "cisco_s500_telnet": { CiscoS300Telnet(profile: $0, channelProvider: nioTelnetChannelProvider) },
         "cisco_tp": { CiscoTpTcCeSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
 
         // MARK: A10 / Accedian
@@ -299,6 +307,8 @@ public enum SSHDispatcher {
 
         // MARK: Fiberstore / Flexvnf / Fortinet / Fujitsu / Furukawa
         "fiberstore_fsos": { FiberstoreFsosSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
+        "fiberstore_fsosv2": { FiberstoreFsosV2SSH(profile: $0, channelProvider: nioSSHChannelProvider) },
+        "fiberstore_fsosv2_telnet": { FiberstoreFsosV2Telnet(profile: $0, channelProvider: nioTelnetChannelProvider) },
         "fiberstore_networkos": { FiberstoreNetworkOSSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
         "flexvnf": { FlexvnfSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
         "fortinet": { FortinetSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
@@ -340,8 +350,12 @@ public enum SSHDispatcher {
         "huawei_ont_telnet": { HuaweiONTTelnet(profile: $0, channelProvider: nioTelnetChannelProvider) },
         "huawei_smartax": { HuaweiSmartAXSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
         "huawei_smartaxmmi": { HuaweiSmartAXSSHMMI(profile: $0, channelProvider: nioSSHChannelProvider) },
-        // huawei_olt has no ported driver yet — genuinely missing, not
-        // just unregistered (see PLATFORMS.md).
+        // Huawei OLT is Netmiko's own alias for the SmartAX driver, not a
+        // distinct device — including its telnet variant, which Netmiko
+        // maps to the *SSH* class (no dedicated SmartAX Telnet class
+        // exists upstream). Preserved exactly as Netmiko has it.
+        "huawei_olt": { HuaweiSmartAXSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
+        "huawei_olt_telnet": { HuaweiSmartAXSSH(profile: $0, channelProvider: nioTelnetChannelProvider) },
 
         // MARK: Iij / Infinera / Ipinfusion
         "iij_seilos": { IIJSeilosSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
@@ -439,6 +453,9 @@ public enum SSHDispatcher {
         "ubiquiti_unifiswitch": { UbiquitiUnifiSwitchSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
         "vyos": { VyOSSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
         "vyatta_vyos": { VyOSSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
+        // Brocade acquired Vyatta and rebranded its vRouter under this
+        // name — same VyOS driver, no Brocade-specific class in Netmiko.
+        "brocade_vyos": { VyOSSSH(profile: $0, channelProvider: nioSSHChannelProvider) },
 
         // MARK: Vertiv / Watchguard / Yamaha
         "vertiv_mph": { VertivMPHSSH(profile: $0, channelProvider: nioSSHChannelProvider) },

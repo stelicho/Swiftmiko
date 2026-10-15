@@ -65,17 +65,25 @@ reconnecting — see [Terminal server and redispatch](./EXAMPLES.md#terminal-ser
 for the full worked example (switch → terminal server → end device,
 two hops, two redispatches).
 
-### Most `deviceType` strings from `PLATFORMS.md` connect out of the box
+### Every `deviceType` string in `PLATFORMS.md` now connects out of the box
 
 `SSHDispatcher.defaultConnectionFactories` (`Sources/SSHDispatcher.swift`)
-registers essentially every vendor driver ported under `Sources/`. A
-small number of `deviceType` strings that exist in Netmiko have no
-Swift driver ported yet (e.g. `huawei_olt`, `fiberstore_fsosv2`,
-`brocade_vyos`) and are intentionally left unregistered rather than
-pointed at a guessed-at substitute — check `PLATFORMS.md`'s status
-column, or `SSHDispatcher.platforms`, if a `deviceType` you expect
-doesn't resolve. `DispatcherRegistry.shared.registerConnection` lets
-you add (or override) an entry at runtime without touching
+registers every vendor driver ported under `Sources/`, plus the
+handful of Netmiko `deviceType` strings that turn out to be pure
+aliases to one of those drivers rather than a distinct class:
+`huawei_olt`/`huawei_olt_telnet` (alias to `HuaweiSmartAXSSH` — the
+telnet variant aliases the *SSH* class too, matching a real quirk in
+Netmiko's own mapping, since no dedicated SmartAX Telnet class exists
+upstream either), `brocade_vyos` (alias to `VyOSSSH`), and
+`cisco_s500`/`cisco_s500_telnet` (alias to `CiscoS300SSH`/
+`CiscoS300Telnet`). `fiberstore_fsosv2`/`fiberstore_fsosv2_telnet`
+looked like it belonged in that same bucket but is actually Netmiko's
+own distinct class, so it's ported as its own Swift class
+(`FiberstoreFsosV2SSH`/`FiberstoreFsosV2Telnet`) alongside the
+original `FiberstoreFsosSSH`. If a `deviceType` you expect still
+doesn't resolve, check `PLATFORMS.md`'s status column, or
+`SSHDispatcher.platforms`. `DispatcherRegistry.shared.registerConnection`
+lets you add (or override) an entry at runtime without touching
 `SSHDispatcher.swift`:
 
 ```swift

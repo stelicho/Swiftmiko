@@ -21,9 +21,9 @@ Update this table as you work through GNS3. Everything starts ⬜.
 Every driver below is registered in `SSHDispatcher.defaultConnectionFactories`
 and reachable through `connectHandler` by its `deviceType` string — see
 `SSHDispatcher.platforms` for the exact list, or
-[`COMMON_ISSUES.md`](./COMMON_ISSUES.md) for the small number of
-`deviceType` strings that exist in Netmiko but have no Swift driver
-ported yet.
+[`COMMON_ISSUES.md`](./COMMON_ISSUES.md) for the handful of
+`deviceType` strings that are pure aliases to another driver's class
+rather than a distinct one of their own.
 
 ---
 

@@ -158,3 +158,117 @@ public final class FiberstoreFsosSSH: CiscoBaseConnection, NoEnable {
         }
     }
 }
+
+// MARK: - FiberstoreFsosV2Base
+
+/// Common implementation for Fiberstore FSOS V2 devices (both SSH and
+/// Telnet).
+///
+/// Maps to netmiko's FiberstoreFsosV2Base(CiscoBaseConnection).
+///
+/// Unlike the original FSOS driver above, V2 uses a standard login
+/// flow and real enable mode (not NoEnable) — enable mode is required
+/// just to set the terminal width during session prep.
+open class FiberstoreFsosV2Base: CiscoBaseConnection {
+
+    // MARK: Session Preparation
+
+    /// Maps to netmiko's session_preparation():
+    ///     self._test_channel_read(pattern=r"[>#]")
+    ///     self.set_base_prompt()
+    ///     self.enable()
+    ///     self.set_terminal_width(command="terminal width 256", pattern="terminal")
+    ///     self.disable_paging(command="terminal length 0")
+    ///     time.sleep(0.3 * self.global_delay_factor)
+    ///     self.clear_buffer()
+    override public func sessionPreparation() async throws {
+        _ = try await testChannelRead(pattern: "[>#]")
+        try await setBasePrompt()
+        // FS OS requires enable mode to set terminal width.
+        try await enterEnableMode(secret: profile.secret ?? "")
+        try await setTerminalWidth(command: "terminal width 256", pattern: "terminal")
+        try await disablePaging(command: "terminal length 0")
+        try await Task.sleep(nanoseconds: UInt64(selectDelayFactor(0.3) * 1_000_000_000))
+        try await clearBuffer()
+    }
+
+    // MARK: Config Mode
+
+    /// Maps to netmiko's config_mode(config_command="config").
+    @discardableResult
+    override public func enterConfigMode(
+        command: String = "config",
+        pattern: String = "",
+        dotAll: Bool = false
+    ) async throws -> String {
+        return try await super.enterConfigMode(command: command, pattern: pattern)
+    }
+
+    /// Maps to netmiko's check_config_mode(check_string="config#").
+    override public func isInConfigMode(
+        checkString: String = "config#",
+        pattern: String = ""
+    ) async throws -> Bool {
+        return try await super.isInConfigMode(checkString: checkString, pattern: pattern)
+    }
+
+    /// Maps to netmiko's exit_config_mode(exit_config="exit", pattern=r"#.*").
+    @discardableResult
+    override public func exitConfigMode(
+        exitConfig: String = "exit",
+        pattern: String = #"#.*"#
+    ) async throws -> String {
+        return try await super.exitConfigMode(exitConfig: exitConfig, pattern: pattern)
+    }
+
+    // MARK: Save Config
+
+    /// Maps to netmiko's save_config(cmd="write").
+    override public func saveConfig(
+        command: String = "write",
+        confirm: Bool = false,
+        confirmResponse: String = ""
+    ) async throws -> String {
+        return try await super.saveConfig(
+            command: command,
+            confirm: confirm,
+            confirmResponse: confirmResponse
+        )
+    }
+}
+
+// MARK: - FiberstoreFsosV2SSH
+
+/// Fiberstore FSOS V2 SSH driver — no differences from the base.
+/// Maps to netmiko's FiberstoreFsosV2SSH(FiberstoreFsosV2Base).
+public final class FiberstoreFsosV2SSH: FiberstoreFsosV2Base {}
+
+// MARK: - FiberstoreFsosV2Telnet
+
+/// Fiberstore FSOS V2 Telnet driver.
+///
+/// Maps to netmiko's FiberstoreFsosV2Telnet(FiberstoreFsosV2Base).
+/// Overrides the default line ending to "\r\n" unless the caller's
+/// profile already specifies one — same pattern as AristaTelnet.
+public final class FiberstoreFsosV2Telnet: FiberstoreFsosV2Base {
+
+    public init(
+        profile: ConnectionProfile,
+        sessionLog: SessionLogConfig? = nil,
+        loggerEnabled: Bool = true,
+        channel: (any Channel)? = nil,
+        channelProvider: ChannelProvider? = nil
+    ) {
+        var adjustedProfile = profile
+        if adjustedProfile.returnCharacter.isEmpty {
+            adjustedProfile.returnCharacter = "\r\n"
+        }
+        super.init(
+            profile: adjustedProfile,
+            sessionLog: sessionLog,
+            loggerEnabled: loggerEnabled,
+            channel: channel,
+            channelProvider: channelProvider
+        )
+    }
+}
