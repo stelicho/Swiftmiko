@@ -266,6 +266,37 @@ extension UserAuthenticationStateMachine {
         }
     }
 
+    /// A UserAuthInfoRequest message (RFC 4256 §3.2) was received — part of an
+    /// ongoing keyboard-interactive attempt. A server may send several of these in
+    /// a row before a final success/failure (e.g. a EULA prompt in one round and a
+    /// password prompt in the next), so unlike `receiveUserAuthFailure` this never
+    /// transitions `state` away from `.awaitingResponses` — it stays there across
+    /// every round of the same attempt.
+    mutating func receiveUserAuthInfoRequest(
+        _ message: SSHMessage.UserAuthInfoRequestMessage
+    ) throws -> EventLoopFuture<SSHMessage.UserAuthInfoResponseMessage>? {
+        switch (self.delegate, self.state) {
+        case (.client(let delegate), .awaitingResponses):
+            return self.requestKeyboardInteractiveResponse(message, delegate: delegate)
+        case (.client, .authenticationSucceeded):
+            // We should ignore all further auth messages in this state.
+            return nil
+        case (.client, .idle), (.client, .awaitingServiceAcceptance), (.client, .awaitingNextRequest),
+            (.client, .authenticationFailed):
+            throw NIOSSHError.protocolViolation(
+                protocolName: Self.protocolName,
+                violation: "unsolicited keyboard-interactive info request"
+            )
+        case (.server, _):
+            // Servers may never receive this (NIOSSH's server role doesn't issue
+            // keyboard-interactive challenges — see nextAuthResponse's .keyboardInteractive case).
+            throw NIOSSHError.protocolViolation(
+                protocolName: Self.protocolName,
+                violation: "client sent keyboard-interactive info request"
+            )
+        }
+    }
+
     mutating func receiveUserAuthBanner(_: SSHMessage.UserAuthBannerMessage) throws {
         switch (self.delegate, self.state) {
         case (.client, .idle), (.client, .authenticationSucceeded):
@@ -365,6 +396,24 @@ extension UserAuthenticationStateMachine {
             preconditionFailure("Servers can never enter authenticationFailed")
         case (.client, _):
             preconditionFailure("Clients never send auth responses")
+        }
+    }
+
+    /// Sent by the client in answer to a `UserAuthInfoRequestMessage`. Unlike
+    /// `sendUserAuthPKOK` above (a server response that always resolves one
+    /// pending auth request), this doesn't change `state` at all — the same
+    /// `.awaitingResponses` the client has been in since offering
+    /// `.keyboardInteractive` keeps holding until the server finally sends
+    /// success, failure, or another info request.
+    mutating func sendUserAuthInfoResponse(_: SSHMessage.UserAuthInfoResponseMessage) {
+        switch (self.delegate, self.state) {
+        case (.client, .awaitingResponses):
+            break
+        case (.client, .idle), (.client, .awaitingServiceAcceptance), (.client, .awaitingNextRequest),
+            (.client, .authenticationSucceeded), (.client, .authenticationFailed):
+            preconditionFailure("Sent keyboard-interactive response without an outstanding info request")
+        case (.server, _):
+            preconditionFailure("Servers may not send keyboard-interactive responses")
         }
     }
 
@@ -475,6 +524,20 @@ extension UserAuthenticationStateMachine {
             try request.map { try SSHMessage.UserAuthRequestMessage(request: $0, sessionID: sessionID) }
         }
     }
+
+    fileprivate func requestKeyboardInteractiveResponse(
+        _ message: SSHMessage.UserAuthInfoRequestMessage,
+        delegate: NIOSSHClientUserAuthenticationDelegate
+    ) -> EventLoopFuture<SSHMessage.UserAuthInfoResponseMessage> {
+        let promise = self.loop.makePromise(of: [String].self)
+        delegate.nextKeyboardInteractiveChallenge(
+            name: message.name,
+            instruction: message.instruction,
+            prompts: message.prompts.map { KeyboardInteractivePrompt(prompt: $0.prompt, echo: $0.echo) },
+            responsePromise: promise
+        )
+        return promise.futureResult.map { SSHMessage.UserAuthInfoResponseMessage(responses: $0) }
+    }
 }
 
 // MARK: Interacting with server delegate
@@ -553,6 +616,17 @@ extension UserAuthenticationStateMachine {
             return promise.futureResult.map { outcome in
                 .init(outcome, supportedMethods: supportedMethods)
             }
+
+        case .keyboardInteractive:
+            // This fork added keyboard-interactive support for the CLIENT role only
+            // (what Swiftmiko needs to talk to real keyboard-interactive servers like
+            // PAN-OS). There is no NIOSSHServerUserAuthenticationDelegate hook to
+            // collect and issue prompts from the server side, so reject cleanly —
+            // same shape as an unsupported publicKey algorithm above — rather than
+            // pretending to support a method this fork can't actually serve.
+            return self.loop.makeSucceededFuture(
+                .failure(.init(authentications: delegate.supportedAuthenticationMethods.strings, partialSuccess: false))
+            )
         }
     }
 }

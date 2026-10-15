@@ -18,6 +18,12 @@ protocol SendsUserAuthMessages {
     var userAuthStateMachine: UserAuthenticationStateMachine { get set }
 
     var serializer: SSHPacketSerializer { get set }
+
+    /// Needed so `writeUserAuthRequest` can flag the parser to read message type
+    /// 60 as `UserAuthInfoRequestMessage` rather than `UserAuthPKOKMessage` for the
+    /// duration of a keyboard-interactive attempt — see
+    /// `UserAuthMethodSpecificMessageHint` in `SSHPacketParser.swift`.
+    var parser: SSHPacketParser { get set }
 }
 
 extension SendsUserAuthMessages {
@@ -37,6 +43,15 @@ extension SendsUserAuthMessages {
         into buffer: inout ByteBuffer
     ) throws {
         self.userAuthStateMachine.sendUserAuthRequest(message)
+
+        // Flip how the parser will interpret the next type-60 message for the
+        // duration of this attempt — see SendsUserAuthMessages.parser's doc comment.
+        if case .keyboardInteractive = message.method {
+            self.parser.pendingUserAuthHint = .keyboardInteractiveInfoRequest
+        } else {
+            self.parser.pendingUserAuthHint = .publicKeyOK
+        }
+
         try self.serializer.serialize(message: .userAuthRequest(message), to: &buffer)
     }
 
@@ -62,5 +77,13 @@ extension SendsUserAuthMessages {
     mutating func writeUserAuthPKOK(_ message: SSHMessage.UserAuthPKOKMessage, into buffer: inout ByteBuffer) throws {
         self.userAuthStateMachine.sendUserAuthPKOK(message)
         try self.serializer.serialize(message: .userAuthPKOK(message), to: &buffer)
+    }
+
+    mutating func writeUserAuthInfoResponse(
+        _ message: SSHMessage.UserAuthInfoResponseMessage,
+        into buffer: inout ByteBuffer
+    ) throws {
+        self.userAuthStateMachine.sendUserAuthInfoResponse(message)
+        try self.serializer.serialize(message: .userAuthInfoResponse(message), to: &buffer)
     }
 }

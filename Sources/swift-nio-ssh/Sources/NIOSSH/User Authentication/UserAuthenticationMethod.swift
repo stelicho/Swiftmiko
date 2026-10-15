@@ -33,8 +33,15 @@ public struct NIOSSHAvailableUserAuthenticationMethods: OptionSet, Sendable {
     /// Host-based authentication is acceptable.
     public static let hostBased: NIOSSHAvailableUserAuthenticationMethods = .init(rawValue: 1 << 2)
 
+    /// Keyboard-interactive authentication (RFC 4256) is acceptable — the server
+    /// drives a sequence of named prompts (which may span multiple rounds) rather
+    /// than a single fixed credential.
+    public static let keyboardInteractive: NIOSSHAvailableUserAuthenticationMethods = .init(rawValue: 1 << 3)
+
     /// A short-hand for all supported authentication types.
-    public static let all: NIOSSHAvailableUserAuthenticationMethods = [.publicKey, .password, .hostBased]
+    public static let all: NIOSSHAvailableUserAuthenticationMethods = [
+        .publicKey, .password, .hostBased, .keyboardInteractive,
+    ]
 }
 
 extension NIOSSHAvailableUserAuthenticationMethods {
@@ -49,6 +56,8 @@ extension NIOSSHAvailableUserAuthenticationMethods {
                 self.insert(.password)
             case "hostbased":
                 self.insert(.hostBased)
+            case "keyboard-interactive":
+                self.insert(.keyboardInteractive)
             default:
                 // This is an unknown method, which we ignore.
                 break
@@ -63,7 +72,7 @@ extension NIOSSHAvailableUserAuthenticationMethods {
 
         // We need an array.
         var methods = [Substring]()
-        methods.reserveCapacity(3)
+        methods.reserveCapacity(4)
 
         if self.contains(.password) {
             methods.append("password")
@@ -73,6 +82,9 @@ extension NIOSSHAvailableUserAuthenticationMethods {
         }
         if self.contains(.hostBased) {
             methods.append("hostbased")
+        }
+        if self.contains(.keyboardInteractive) {
+            methods.append("keyboard-interactive")
         }
 
         return methods
@@ -187,6 +199,13 @@ extension NIOSSHUserAuthenticationOffer {
 
         /// The client believes it does not need authentication.
         case none
+
+        /// The client would like to perform keyboard-interactive authentication
+        /// (RFC 4256). The server drives this with a server-initiated sequence of
+        /// named prompts — answered via
+        /// ``NIOSSHClientUserAuthenticationDelegate/nextKeyboardInteractiveChallenge(name:instruction:prompts:responsePromise:)``,
+        /// not through this offer itself, which only starts the exchange.
+        case keyboardInteractive
     }
 }
 
@@ -256,6 +275,10 @@ extension SSHMessage.UserAuthRequestMessage {
             fatalError("Unsupported")
         case .none:
             self.method = .none
+        case .keyboardInteractive:
+            // RFC 4256 §3.1: language tag and submethods are conventionally both
+            // empty on the initial request; the server picks what to actually ask.
+            self.method = .keyboardInteractive(language: "", submethods: "")
         }
     }
 }

@@ -14,6 +14,21 @@
 
 import NIOCore
 
+/// A single server-supplied prompt within a keyboard-interactive (RFC 4256) challenge.
+public struct KeyboardInteractivePrompt: Sendable {
+    /// Text to display to the user.
+    public var prompt: String
+
+    /// Whether the user's typed response should be echoed back (`false` for
+    /// anything password-shaped).
+    public var echo: Bool
+
+    public init(prompt: String, echo: Bool) {
+        self.prompt = prompt
+        self.echo = echo
+    }
+}
+
 /// A ``NIOSSHClientUserAuthenticationDelegate`` is an object that can provide a sequence of
 /// SSH user authentication methods based on the the acceptable list from the server.
 ///
@@ -38,4 +53,41 @@ public protocol NIOSSHClientUserAuthenticationDelegate {
         availableMethods: NIOSSHAvailableUserAuthenticationMethods,
         nextChallengePromise: EventLoopPromise<NIOSSHUserAuthenticationOffer?>
     )
+
+    /// Called after this delegate has offered `.keyboardInteractive` and the server responds with a
+    /// challenge (RFC 4256 §3.2) — possibly more than once in a row, if the server needs multiple
+    /// rounds (e.g. a EULA acceptance prompt followed, in a separate round, by a password prompt).
+    /// The delegate must supply exactly one response per prompt, in order, by completing
+    /// `responsePromise`; failing it ends the keyboard-interactive attempt.
+    ///
+    /// A default implementation is provided that fails `responsePromise`, so delegates that never
+    /// offer `.keyboardInteractive` don't need to implement this at all.
+    ///
+    /// - parameters:
+    ///     - name: Challenge title, intended for display.
+    ///     - instruction: Free-text instructions covering every prompt in this round.
+    ///     - prompts: The prompts to answer, in order.
+    ///     - responsePromise: An `EventLoopPromise` to be fulfilled with one response per prompt.
+    func nextKeyboardInteractiveChallenge(
+        name: String,
+        instruction: String,
+        prompts: [KeyboardInteractivePrompt],
+        responsePromise: EventLoopPromise<[String]>
+    )
+}
+
+extension NIOSSHClientUserAuthenticationDelegate {
+    public func nextKeyboardInteractiveChallenge(
+        name: String,
+        instruction: String,
+        prompts: [KeyboardInteractivePrompt],
+        responsePromise: EventLoopPromise<[String]>
+    ) {
+        responsePromise.fail(
+            NIOSSHError.protocolViolation(
+                protocolName: "userauth",
+                violation: "received a keyboard-interactive challenge but this delegate does not support it"
+            )
+        )
+    }
 }

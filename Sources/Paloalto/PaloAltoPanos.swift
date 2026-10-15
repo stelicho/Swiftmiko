@@ -18,27 +18,18 @@ import Foundation
 /// Maps to netmiko's SSHClient_interactive(SSHClient), specifically
 /// its pa_banner_handler and overridden _auth().
 ///
-/// This is a genuinely different authentication mechanism from the
-/// "no-auth" transport pattern used by SG200, Calix B6, Dell
-/// PowerConnect, Ericsson MiniLink, and Fiberstore FSOS elsewhere in
-/// this vendor set. Those devices either always report success
-/// regardless of credentials, or don't support password auth at the
-/// SSH protocol level at all. PAN-OS is different again: it uses
-/// standard SSH "keyboard-interactive" authentication (RFC 4256),
-/// where the SERVER drives a sequence of named prompts and the
-/// CLIENT answers each one. PAN-OS's own prompts commonly include a
-/// EULA-style "Do you accept the terms..." banner alongside the
-/// normal password prompt — both need answering in the SAME
-/// interactive exchange, which standard password auth has no
-/// mechanism for at all.
-///
-/// This represents a genuine, separate architectural requirement:
-/// Swiftmiko's transport layer needs to support keyboard-interactive
-/// auth with a pluggable prompt-answering callback, not just
-/// password/key/agent/no-auth. Worth designing as its own case
-/// rather than folding into the existing no-auth-transport backlog
-/// item, since the underlying SSH mechanism is fundamentally
-/// different.
+/// PAN-OS uses standard SSH "keyboard-interactive" authentication
+/// (RFC 4256), where the SERVER drives a sequence of named prompts
+/// and the CLIENT answers each one — commonly a EULA-style "Do you
+/// accept the terms..." banner alongside the normal password prompt,
+/// sometimes in the same round, sometimes (per real-world PAN-OS
+/// firmware) in two separate rounds. The actual RFC 4256 wire support
+/// (message types, the auth state machine's multi-round loop, the
+/// delegate callback) lives in the vendored `swift-nio-ssh` fork
+/// (`NIOSSHClientUserAuthenticationDelegate.nextKeyboardInteractiveChallenge`)
+/// — this type is just the PAN-OS-specific prompt-answering policy,
+/// wired up via `PaloAltoKeyboardInteractiveAuthDelegate` in
+/// `Sources/NIOSSHChannel.swift`.
 public struct PaloAltoInteractiveAuthHandler {
     private let password: String
 
@@ -55,23 +46,25 @@ public struct PaloAltoInteractiveAuthHandler {
     /// For each (prompt, echo) pair the server sends, this responds
     /// "yes" to anything resembling a terms-acceptance banner, and
     /// the connection's password to anything resembling a password
-    /// prompt. Any prompt matching neither pattern is left
-    /// unanswered — mirroring Netmiko's own behavior, which silently
-    /// skips prompts it doesn't recognize rather than guessing.
+    /// prompt. Any prompt matching neither pattern gets an empty
+    /// response rather than being skipped — RFC 4256 §3.3 requires
+    /// exactly one response per prompt, so unlike Netmiko (which can
+    /// get away with a short list because Paramiko doesn't enforce
+    /// this), dropping an unrecognized prompt here would misalign
+    /// every response after it.
     public func respond(
         title: String,
         instructions: String,
         prompts: [(prompt: String, echo: Bool)]
     ) -> [String] {
-        var responses: [String] = []
-        for (prompt, _) in prompts {
+        prompts.map { prompt, _ in
             if prompt.contains("Do you accept") {
-                responses.append("yes")
+                return "yes"
             } else if prompt.contains("ssword") {
-                responses.append(password)
+                return password
             }
+            return ""
         }
-        return responses
     }
 }
 
@@ -334,26 +327,13 @@ open class PaloAltoPanosBase: BaseConnection, NoEnable {
 ///
 /// Maps to netmiko's PaloAltoPanosSSH(PaloAltoPanosBase).
 ///
-/// Uses keyboard-interactive SSH authentication when neither keys nor
-/// agent auth were requested — see PaloAltoInteractiveAuthHandler
-/// above for the full explanation of why this is architecturally
-/// distinct from the no-auth transport pattern used elsewhere.
-public final class PaloAltoPanosSSH: PaloAltoPanosBase {
-
-    /// Maps to netmiko's _get_ssh_client_instance().
-    /// Signals that keyboard-interactive auth (via
-    /// PaloAltoInteractiveAuthHandler) should be used for this
-    /// connection, rather than standard password authentication —
-    /// distinct from every prior driver's "use noauth" signal.
-    internal func requiresInteractiveAuth() -> Bool {
-        switch profile.auth {
-        case .keyFile, .sshAgent:
-            return false
-        case .password, .none:
-            return true
-        }
-    }
-}
+/// Maps to netmiko's _get_ssh_client_instance(): when password auth is
+/// configured, the actual connection uses keyboard-interactive SSH
+/// authentication (via PaloAltoInteractiveAuthHandler), not plain
+/// password auth. That choice lives in `NIOSSHChannel.makeAuthDelegate()`
+/// (keyed off `profile.deviceType`), not here — this class has no
+/// transport-level state of its own to add over the base.
+public final class PaloAltoPanosSSH: PaloAltoPanosBase {}
 
 // MARK: - PaloAltoPanosTelnet
 

@@ -11,18 +11,17 @@ import Combine
 /// config) — any combination of which is only valid when `partial` is
 /// set, exactly like the guard this view model mirrors below.
 ///
-/// IMPORTANT caveat, surfaced here rather than left for Connect to fail
-/// on silently: PAN-OS's SSH login typically uses keyboard-interactive
-/// authentication (RFC 4256) rather than plain password auth, because
-/// older/certain PAN-OS versions fold a EULA-acceptance prompt into the
-/// same exchange as the password prompt. The driver defines
-/// `PaloAltoInteractiveAuthHandler` for exactly this, but nothing in
-/// the NIOSSH transport layer actually wires it in yet — `connect()`
-/// here goes through plain password auth. Devices that accept password
-/// auth as a fallback will connect fine; devices that require
-/// keyboard-interactive will fail at the transport level before this
-/// driver even gets a chance to run. Worth knowing before assuming a
-/// failed connection here is this demo's bug rather than a real gap.
+/// PAN-OS's SSH login typically uses keyboard-interactive authentication
+/// (RFC 4256) rather than plain password auth, because older/certain
+/// PAN-OS versions fold a EULA-acceptance prompt into the same exchange
+/// as the password prompt — sometimes across two separate server-driven
+/// rounds. `connect()` here still just passes `.password(password)`;
+/// `PaloAltoKeyboardInteractiveAuthDelegate` (Sources/NIOSSHChannel.swift)
+/// is what actually offers keyboard-interactive first and answers the
+/// prompts via `PaloAltoInteractiveAuthHandler`, transparently to this
+/// view model — it kicks in automatically for `deviceType ==
+/// "paloalto_panos"`, falling back to plain password auth only if the
+/// server doesn't offer keyboard-interactive at all.
 @MainActor
 final class PaloAltoViewModel: ObservableObject {
     @Published var host = ""

@@ -24,11 +24,6 @@ struct ContentView: View {
                 }
                 .padding(4)
 
-                Text("PAN-OS often expects keyboard-interactive SSH auth (to fold a EULA prompt in with the password) — that's not wired into Swiftmiko's transport yet, so this connects with plain password auth. Devices that accept password auth as a fallback work fine; ones that insist on keyboard-interactive will fail to connect here.")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 4)
-
                 Toggle("Allow legacy AES-CBC ciphers", isOn: $viewModel.allowLegacyCiphers)
                     .help("Only enable this for old firmware that doesn't support AES-GCM. AES-CBC is a known-weaker cipher — use it only against lab/EOL gear you control.")
                     .padding(.horizontal, 4)

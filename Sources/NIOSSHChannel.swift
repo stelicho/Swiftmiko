@@ -71,6 +71,70 @@ final class PasswordAuthDelegate: NIOSSHClientUserAuthenticationDelegate, @unche
     }
 }
 
+// MARK: - User-auth delegate: PAN-OS keyboard-interactive
+
+// @unchecked Sendable: same single-use-per-attempt reasoning as PasswordAuthDelegate.
+/// Offers keyboard-interactive auth (RFC 4256) first, falling back to plain
+/// password auth only if the server doesn't support it — matches real PAN-OS
+/// behavior (keyboard-interactive is the normal path; see README/COMMON_ISSUES
+/// for the devices that still accept a bare password as a fallback). Answering
+/// the server's actual prompts is delegated to `PaloAltoInteractiveAuthHandler`
+/// (`Sources/Paloalto/PaloAltoPanos.swift`), which already knows PAN-OS's
+/// specific EULA-banner/password prompt shapes — this class only owns the
+/// SSH-auth-method sequencing, not prompt interpretation.
+final class PaloAltoKeyboardInteractiveAuthDelegate: NIOSSHClientUserAuthenticationDelegate, @unchecked Sendable {
+    private let username: String
+    private let interactiveHandler: PaloAltoInteractiveAuthHandler
+    private let password: String
+    private var offeredKeyboardInteractive = false
+    private var offeredPassword = false
+
+    init(username: String, password: String) {
+        self.username = username
+        self.password = password
+        self.interactiveHandler = PaloAltoInteractiveAuthHandler(password: password)
+    }
+
+    func nextAuthenticationType(
+        availableMethods: NIOSSHAvailableUserAuthenticationMethods,
+        nextChallengePromise: EventLoopPromise<NIOSSHUserAuthenticationOffer?>
+    ) {
+        if !offeredKeyboardInteractive, availableMethods.contains(.keyboardInteractive) {
+            offeredKeyboardInteractive = true
+            nextChallengePromise.succeed(
+                NIOSSHUserAuthenticationOffer(username: username, serviceName: "", offer: .keyboardInteractive)
+            )
+            return
+        }
+        if !offeredPassword, availableMethods.contains(.password) {
+            offeredPassword = true
+            nextChallengePromise.succeed(
+                NIOSSHUserAuthenticationOffer(
+                    username: username,
+                    serviceName: "",
+                    offer: .password(.init(password: password))
+                )
+            )
+            return
+        }
+        nextChallengePromise.succeed(nil)
+    }
+
+    func nextKeyboardInteractiveChallenge(
+        name: String,
+        instruction: String,
+        prompts: [KeyboardInteractivePrompt],
+        responsePromise: EventLoopPromise<[String]>
+    ) {
+        let responses = interactiveHandler.respond(
+            title: name,
+            instructions: instruction,
+            prompts: prompts.map { (prompt: $0.prompt, echo: $0.echo) }
+        )
+        responsePromise.succeed(responses)
+    }
+}
+
 // MARK: - User-auth delegate: no-auth / fallback
 
 // @unchecked Sendable: stateless, so capturing it across the channel
@@ -344,6 +408,11 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
     private func makeAuthDelegate() throws -> any NIOSSHClientUserAuthenticationDelegate & Sendable {
         switch profile.auth {
         case .password(let password):
+            // PAN-OS's normal SSH auth path is keyboard-interactive, not plain
+            // password — see PaloAltoKeyboardInteractiveAuthDelegate's doc comment.
+            if profile.deviceType == "paloalto_panos" {
+                return PaloAltoKeyboardInteractiveAuthDelegate(username: profile.username, password: password)
+            }
             return PasswordAuthDelegate(username: profile.username, password: password)
         case .keyFile(let path, let passphrase):
             let nioKey = try SSHKeyLoader.load(path: path, passphrase: passphrase)

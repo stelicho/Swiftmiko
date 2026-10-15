@@ -107,11 +107,13 @@ config/commit behavior;
 driver smuggles terminal settings into the SSH username itself and
 absorbs several possible post-login prompts before `connect()` returns;
 [`PaloAltoDemo`](./Examples/PaloAltoDemo) drives PAN-OS's partial-commit
-scoping (device-and-network / policy-and-objects / vsys / no-vsys) —
-and calls out a real gap along the way: PAN-OS's usual
-keyboard-interactive SSH auth isn't wired into Swiftmiko's transport
-yet, so this demo only works against gear that still accepts plain
-password auth as a fallback.
+scoping (device-and-network / policy-and-objects / vsys / no-vsys).
+PAN-OS's usual SSH auth method — keyboard-interactive (RFC 4256),
+where the server drives a sequence of named prompts, sometimes a EULA
+banner and a password prompt in two separate rounds — is implemented
+down at the transport layer (`Sources/NIOSSHChannel.swift` and the
+vendored `swift-nio-ssh` fork), not just this demo, so it applies to
+any `paloalto_panos` connection using password auth.
 
 [`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
 one out — a browser-based sibling of `CommandRunnerDemo` built with

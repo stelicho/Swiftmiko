@@ -347,6 +347,11 @@ struct SSHConnectionStateMachine {
                         self = .userAuthentication(state)
                         return result
 
+                    case .userAuthInfoRequest(let message):
+                        let result = try state.receiveUserAuthInfoRequest(message)
+                        self = .userAuthentication(state)
+                        return result
+
                     case .disconnect:
                         self = .receivedDisconnect(state.role)
                         return .disconnect
@@ -973,6 +978,10 @@ struct SSHConnectionStateMachine {
 
             case .userAuthPKOK(let message):
                 try state.writeUserAuthPKOK(message, into: &buffer)
+                self.state = .userAuthentication(state)
+
+            case .userAuthInfoResponse(let message):
+                try state.writeUserAuthInfoResponse(message, into: &buffer)
                 self.state = .userAuthentication(state)
 
             case .disconnect:

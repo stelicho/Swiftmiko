@@ -14,6 +14,18 @@
 
 import NIOCore
 
+/// Disambiguates SSH message type 60, which RFC 4252's `SSH_MSG_USERAUTH_PK_OK` and
+/// RFC 4256's `SSH_MSG_USERAUTH_INFO_REQUEST` both use. SSH's 50-79 user-auth message
+/// range is deliberately method-specific — the same numeric type byte means a different
+/// message depending on which auth method is currently in flight — so the byte alone
+/// can never disambiguate; only the state machine driving that method knows which one
+/// to expect next. `SSHPacketParser` carries this as a tiny piece of userauth context
+/// purely to answer that one question; it has no other opinion about auth state.
+enum UserAuthMethodSpecificMessageHint {
+    case publicKeyOK
+    case keyboardInteractiveInfoRequest
+}
+
 struct SSHPacketParser {
     enum State {
         case initialized
@@ -54,6 +66,13 @@ struct SSHPacketParser {
     internal var _discardableBytes: Int {
         self.buffer.readerIndex
     }
+
+    /// Set by the user-auth layer (`SendsUserAuthMessages.writeUserAuthRequest`) right
+    /// before sending a `UserAuthRequestMessage`, based on which method that request
+    /// uses. Defaults to `.publicKeyOK`, matching this parser's behavior before
+    /// keyboard-interactive support existed — every prior caller of `readSSHMessage()`
+    /// is unaffected unless it opts into keyboard-interactive auth.
+    var pendingUserAuthHint: UserAuthMethodSpecificMessageHint = .publicKeyOK
 
     init(
         isServer: Bool,
@@ -330,7 +349,9 @@ struct SSHPacketParser {
             buffer.moveReaderIndex(forwardBy: MemoryLayout<UInt32>.size)
 
             var content = try buffer.sliceContentFromPadding()
-            guard let message = try content.readSSHMessage(), content.readableBytes == 0, buffer.readableBytes == 0
+            guard
+                let message = try content.readSSHMessage(pendingUserAuthHint: self.pendingUserAuthHint),
+                content.readableBytes == 0, buffer.readableBytes == 0
             else {
                 // Throw this error if the content wasn't exactly the right length for the message.
                 throw NIOSSHError.invalidPacketFormat
@@ -347,7 +368,9 @@ struct SSHPacketParser {
             }
 
             var content = try protection.decryptAndVerifyRemainingPacket(&buffer, sequenceNumber: self.sequenceNumber)
-            guard let message = try content.readSSHMessage(), content.readableBytes == 0, buffer.readableBytes == 0
+            guard
+                let message = try content.readSSHMessage(pendingUserAuthHint: self.pendingUserAuthHint),
+                content.readableBytes == 0, buffer.readableBytes == 0
             else {
                 // Throw this error if the content wasn't exactly the right length for the message.
                 throw NIOSSHError.invalidPacketFormat
