@@ -82,6 +82,20 @@ public struct ConnectionProfile: Sendable {
     /// should only be set for lab/EOL gear you control.
     public var allowLegacyCiphers: Bool
 
+    /// known_hosts file consulted when `strictHostKeyChecking` is
+    /// true (see `KnownHosts.swift`). `nil` defaults to
+    /// `~/.ssh/known_hosts`. Ignored when `strictHostKeyChecking` is
+    /// false — that case still accepts any host key unconditionally,
+    /// matching this library's long-standing lab/dev-friendly default.
+    public var knownHostsPath: String?
+
+    /// What to do when `strictHostKeyChecking` is true and a host has
+    /// no existing known_hosts entry at all. Does not affect a host
+    /// that already has entries — a presented key matching none of
+    /// them is always rejected regardless of this setting; see
+    /// `KnownHosts.swift`.
+    public var hostKeyPolicy: HostKeyPolicy
+
     public init(
         host: String,
         port: Int = 22,
@@ -105,7 +119,9 @@ public struct ConnectionProfile: Sendable {
         allowedKeyExchangeAlgorithms: Set<String>? = nil,
         disabledPublicKeyAlgorithms: Set<String>? = nil,
         serialSettings: SerialSettings? = nil,
-        allowLegacyCiphers: Bool = false
+        allowLegacyCiphers: Bool = false,
+        knownHostsPath: String? = nil,
+        hostKeyPolicy: HostKeyPolicy = .rejectUnknown
     ) {
         self.host = host
         self.port = port
@@ -130,6 +146,8 @@ public struct ConnectionProfile: Sendable {
         self.disabledPublicKeyAlgorithms = disabledPublicKeyAlgorithms
         self.serialSettings = serialSettings
         self.allowLegacyCiphers = allowLegacyCiphers
+        self.knownHostsPath = knownHostsPath
+        self.hostKeyPolicy = hostKeyPolicy
     }
 
     public var passwordString: String? {

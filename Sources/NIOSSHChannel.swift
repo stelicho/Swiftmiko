@@ -86,13 +86,15 @@ final class NoAuthDelegate: NIOSSHClientUserAuthenticationDelegate, @unchecked S
 
 // MARK: - Host-key validation (accept-all)
 
-final class AcceptAllHostKeysDelegate: NIOSSHClientServerAuthenticationDelegate {
+/// Used when `ConnectionProfile.strictHostKeyChecking` is false (the
+/// default) — see `HostKeyVerification.delegate(for:)` in
+/// `KnownHosts.swift` for the real known_hosts-backed check used when
+/// it's true.
+final class AcceptAllHostKeysDelegate: NIOSSHClientServerAuthenticationDelegate, @unchecked Sendable {
     func validateHostKey(
         hostKey: NIOSSHPublicKey,
         validationCompletePromise: EventLoopPromise<Void>
     ) {
-        // Mirrors ConnectionProfile.strictHostKeyChecking = false (the default).
-        // TODO: implement real known-hosts checking when strictHostKeyChecking is true.
         validationCompletePromise.succeed(())
     }
 }
@@ -245,6 +247,7 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
         let readHandler = self.readHandler
 
         let allowLegacyCiphers = profile.allowLegacyCiphers
+        let serverAuthDelegate = HostKeyVerification.delegate(for: profile)
         let bootstrap = ClientBootstrap(group: _swiftmikoNIOGroup)
             .channelInitializer { channel in
                 channel.eventLoop.makeCompletedFuture {
@@ -252,7 +255,7 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
                     if allowLegacyCiphers {
                         clientConfiguration = SSHClientConfiguration(
                             userAuthDelegate: authDelegate,
-                            serverAuthDelegate: AcceptAllHostKeysDelegate(),
+                            serverAuthDelegate: serverAuthDelegate,
                             globalRequestDelegate: nil,
                             transportProtectionSchemes: LegacyTransportProtection.schemesIncludingLegacyCBC
                         )
@@ -264,7 +267,7 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
                     } else {
                         clientConfiguration = SSHClientConfiguration(
                             userAuthDelegate: authDelegate,
-                            serverAuthDelegate: AcceptAllHostKeysDelegate()
+                            serverAuthDelegate: serverAuthDelegate
                         )
                     }
                     let sshHandler = NIOSSHHandler(

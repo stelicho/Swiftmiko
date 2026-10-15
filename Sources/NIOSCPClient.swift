@@ -289,6 +289,7 @@ public final class NIOSCPClient: SCPClient, @unchecked Sendable {
             authDelegate = NoAuthDelegate()
         }
 
+        let serverAuthDelegate = HostKeyVerification.delegate(for: profile)
         let bootstrap = ClientBootstrap(group: _swiftmikoNIOGroup)
             .channelInitializer { channel in
                 channel.eventLoop.makeCompletedFuture {
@@ -296,7 +297,7 @@ public final class NIOSCPClient: SCPClient, @unchecked Sendable {
                         NIOSSHHandler(
                             role: .client(SSHClientConfiguration(
                                 userAuthDelegate: authDelegate,
-                                serverAuthDelegate: AcceptAllHostKeysDelegate()
+                                serverAuthDelegate: serverAuthDelegate
                             )),
                             allocator: channel.allocator,
                             inboundChildChannelInitializer: nil

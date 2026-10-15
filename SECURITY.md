@@ -25,21 +25,40 @@ used against lab, EOL, or otherwise fully-trusted gear that you
 control and cannot upgrade. Don't enable it for anything reachable by
 or routed through a network you don't fully trust.
 
-### Host key verification is not yet enforced
+### Host key verification is opt-in, not on by default
 
-`ConnectionProfile.strictHostKeyChecking` exists but **is not
-currently implemented**. Every SSH connection accepts whatever host
-key the remote end presents — see `AcceptAllHostKeysDelegate` in
-[`Sources/NIOSSHChannel.swift`](./Sources/NIOSSHChannel.swift), which
-unconditionally succeeds host-key validation regardless of that
-setting. In its current state, Swiftmiko provides no protection
-against a man-in-the-middle presenting a different host key than the
-one you connected to previously.
+`ConnectionProfile.strictHostKeyChecking` defaults to `false`, in
+which case every SSH connection still accepts whatever host key the
+remote end presents (`AcceptAllHostKeysDelegate` in
+[`Sources/NIOSSHChannel.swift`](./Sources/NIOSSHChannel.swift)) — no
+protection against a man-in-the-middle presenting a different host
+key than the device actually has. That default is deliberate: it
+matches this library's lab/dev-oriented posture, where devices get
+re-imaged and re-keyed constantly and verifying against a stale key
+would just be friction.
 
-Treat every connection as unauthenticated-server until this is fixed.
-Real known-hosts-style validation is a known gap, not a hidden one —
-tracked as an open item, and a PR implementing it is welcome (see
-[`CONTRIBUTING.md`](./CONTRIBUTING.md)).
+Set `strictHostKeyChecking = true` to turn this on for real. Doing so
+checks every presented host key against an OpenSSH-format
+`known_hosts` file (`ConnectionProfile.knownHostsPath`, defaulting to
+`~/.ssh/known_hosts`) via `KnownHostsValidatingDelegate` in
+[`Sources/KnownHosts.swift`](./Sources/KnownHosts.swift). A key that
+contradicts an *existing* entry for that host is always rejected —
+regardless of `hostKeyPolicy` — since that's the actual
+MITM-detection property. A host with no entry at all is handled by
+`hostKeyPolicy`: `.rejectUnknown` (the default) refuses it;
+`.autoAdd` trusts it on first connection and records it for next
+time (`ssh -o StrictHostKeyChecking=accept-new` semantics).
+
+Residual gaps in the `known_hosts` support itself, by design rather
+than oversight: no wildcard (`*`/`?`) or `!negated` host patterns, no
+`@cert-authority`/`@revoked` markers. Lines using any of those are
+skipped during parsing (never mismatched, never silently trusted) —
+see the doc comment on `KnownHostsStore` for the reasoning. None of
+these are common in hand-maintained network-device inventories; if
+your `known_hosts` file relies on them for the hosts you're
+connecting to, the affected entries won't be found and you'll either
+need to flatten them to explicit host lines or treat this as still
+unprotected for those hosts specifically.
 
 ## Reporting a vulnerability
 
