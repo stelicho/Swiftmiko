@@ -24,6 +24,7 @@
 //
 
 import Foundation
+import Logging
 
 // MARK: - Connection profile
 
@@ -176,25 +177,51 @@ public struct SessionLogConfig: Sendable {
     }
 }
 
-// MARK: - Minimal logging
+// MARK: - Logging
 
+/// Thin wrapper around swift-log's `Logger`, keeping the same four-method
+/// surface every driver already calls through `logger.trace/debug/info/warning`.
+///
+/// Was backed by a bare `print()` with no real logging backend at all. Now
+/// backed by `Logging.Logger(label:)`, so output format and destination
+/// (stdout, a file, os_log, a multiplex handler, …) follow whatever the
+/// embedding app configures via `LoggingSystem.bootstrap(_:)` — standard
+/// swift-log convention, and nothing Swiftmiko needs its own API for.
+/// Without any bootstrap call, swift-log's own default handler still prints
+/// to stdout, so existing callers see console output either way.
+///
+/// `enabled` still gates emission here directly, ahead of whatever log
+/// level the embedding app's handler is configured with — unchanged from
+/// before this wrapper had a real backend.
 public struct SwiftmikoLogger: Sendable {
     public let label: String
     public var enabled: Bool
+    private var backend: Logger
 
     public init(label: String, enabled: Bool = true) {
         self.label = label
         self.enabled = enabled
+        self.backend = Logger(label: label)
     }
 
-    public func trace(_ message: String) { emit("TRACE", message) }
-    public func debug(_ message: String) { emit("DEBUG", message) }
-    public func info(_ message: String) { emit("INFO", message) }
-    public func warning(_ message: String) { emit("WARNING", message) }
-
-    private func emit(_ level: String, _ message: String) {
+    public func trace(_ message: String) {
         guard enabled else { return }
-        print("[\(level)] \(label): \(message)")
+        backend.trace("\(message)")
+    }
+
+    public func debug(_ message: String) {
+        guard enabled else { return }
+        backend.debug("\(message)")
+    }
+
+    public func info(_ message: String) {
+        guard enabled else { return }
+        backend.info("\(message)")
+    }
+
+    public func warning(_ message: String) {
+        guard enabled else { return }
+        backend.warning("\(message)")
     }
 }
 
