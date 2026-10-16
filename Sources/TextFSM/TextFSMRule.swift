@@ -36,7 +36,11 @@ enum TextFSMRecordOp: String {
 final class TextFSMRule {
     let lineNumber: Int
     let regex: NSRegularExpression
-    let namedGroupNames: [String]
+    /// Synthetic (ICU-safe) group name -> original Value name. Needed
+    /// because ${Name} substitution assembles several Values' templates
+    /// into one pattern, and any of those names (or an ad-hoc named group
+    /// written directly in the rule) may contain underscores ICU rejects.
+    private let groupNameMapping: [String: String]
     let lineOp: TextFSMLineOp
     let recordOp: TextFSMRecordOp
     /// For every line op except `Error`, this is the next state name (or
@@ -54,11 +58,12 @@ final class TextFSMRule {
         let (matchText, actionText) = Self.splitMatchAction(line)
         let substituted = try Self.substituteValues(matchText, valueTemplates: valueTemplates, lineNumber: lineNumber)
         let icuPattern = TextFSMValue.translatePythonRegexSyntax(substituted)
-        guard let compiled = try? NSRegularExpression(pattern: icuPattern) else {
+        let (sanitized, mapping) = TextFSMRegexSupport.sanitizeNamedGroups(in: icuPattern)
+        guard let compiled = try? NSRegularExpression(pattern: sanitized) else {
             throw TextFSMTemplateError.invalidRegex(regex: substituted, lineNumber: lineNumber)
         }
         self.regex = compiled
-        self.namedGroupNames = compiled.swiftmikoNamedGroupNames()
+        self.groupNameMapping = mapping
 
         guard let actionText else {
             self.lineOp = .next
@@ -80,6 +85,20 @@ final class TextFSMRule {
         self.lineOp = lineOp
         self.recordOp = recordOp
         self.newState = newState
+    }
+
+    /// Named-group captures from a successful match against this rule's
+    /// regex, keyed by the ORIGINAL (possibly underscored) Value name —
+    /// translates back through `groupNameMapping` so callers never see the
+    /// synthetic ICU-safe names.
+    func matchedValues(in match: NSTextCheckingResult, line: String) -> [(name: String, text: String)] {
+        var results: [(name: String, text: String)] = []
+        for (synthetic, originalName) in groupNameMapping {
+            let r = match.range(withName: synthetic)
+            guard r.location != NSNotFound, let swiftRange = Range(r, in: line) else { continue }
+            results.append((originalName, String(line[swiftRange])))
+        }
+        return results
     }
 
     // MARK: Splitting "regex -> action" (mirrors MATCH_ACTION)
@@ -150,14 +169,18 @@ final class TextFSMRule {
 
     // MARK: Action parsing (mirrors ACTION_RE / ACTION2_RE / ACTION3_RE)
 
+    // Group names avoid underscores — ICU named capture groups only
+    // accept [A-Za-z][A-Za-z0-9]*. These are purely internal (never
+    // surfaced to callers), so a straight rename is enough; no mapping
+    // needed, unlike the user-facing Value names elsewhere in this file.
     private static let actionRE = try! NSRegularExpression(
-        pattern: #"^\s+(?<ln_op>Continue|Next|Error)(\.(?<rec_op>Clear|Clearall|Record|NoRecord))?(\s+(?<new_state>\w+|".*"))?$"#
+        pattern: #"^\s+(?<lnop>Continue|Next|Error)(\.(?<recop>Clear|Clearall|Record|NoRecord))?(\s+(?<newstate>\w+|".*"))?$"#
     )
     private static let action2RE = try! NSRegularExpression(
-        pattern: #"^\s+(?<rec_op>Clear|Clearall|Record|NoRecord)(\s+(?<new_state>\w+|".*"))?$"#
+        pattern: #"^\s+(?<recop>Clear|Clearall|Record|NoRecord)(\s+(?<newstate>\w+|".*"))?$"#
     )
     private static let action3RE = try! NSRegularExpression(
-        pattern: #"^(\s+(?<new_state>\w+|".*"))?$"#
+        pattern: #"^(\s+(?<newstate>\w+|".*"))?$"#
     )
 
     private static func parseAction(
@@ -172,16 +195,16 @@ final class TextFSMRule {
         }
 
         if let result = actionRE.firstMatch(in: action, range: range) {
-            let lineOp = group(result, "ln_op").flatMap(TextFSMLineOp.init(rawValue:)) ?? .next
-            let recordOp = group(result, "rec_op").flatMap(TextFSMRecordOp.init(rawValue:)) ?? .noRecord
-            return (lineOp, recordOp, group(result, "new_state") ?? "")
+            let lineOp = group(result, "lnop").flatMap(TextFSMLineOp.init(rawValue:)) ?? .next
+            let recordOp = group(result, "recop").flatMap(TextFSMRecordOp.init(rawValue:)) ?? .noRecord
+            return (lineOp, recordOp, group(result, "newstate") ?? "")
         }
         if let result = action2RE.firstMatch(in: action, range: range) {
-            let recordOp = group(result, "rec_op").flatMap(TextFSMRecordOp.init(rawValue:)) ?? .noRecord
-            return (.next, recordOp, group(result, "new_state") ?? "")
+            let recordOp = group(result, "recop").flatMap(TextFSMRecordOp.init(rawValue:)) ?? .noRecord
+            return (.next, recordOp, group(result, "newstate") ?? "")
         }
         if let result = action3RE.firstMatch(in: action, range: range) {
-            return (.next, .noRecord, group(result, "new_state") ?? "")
+            return (.next, .noRecord, group(result, "newstate") ?? "")
         }
         throw TextFSMTemplateError.malformedRuleLine(line: action, lineNumber: lineNumber)
     }

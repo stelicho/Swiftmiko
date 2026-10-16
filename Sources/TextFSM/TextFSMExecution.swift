@@ -86,12 +86,8 @@ extension TextFSMTemplate {
                 guard let match = rule.regex.firstMatch(in: rawLine, range: fullRange),
                       match.range.location == 0 else { continue }
 
-                for groupName in rule.namedGroupNames {
-                    let groupRange = match.range(withName: groupName)
-                    guard groupRange.location != NSNotFound,
-                          let swiftRange = Range(groupRange, in: rawLine) else { continue }
+                for (groupName, text) in rule.matchedValues(in: match, line: rawLine) {
                     guard let valueIndex = values.firstIndex(where: { $0.name == groupName }) else { continue }
-                    let text = String(rawLine[swiftRange])
                     values[valueIndex].assign(text)
                     if values[valueIndex].options.contains(.fillup) {
                         fillUp(valueIndex: valueIndex, text: text)

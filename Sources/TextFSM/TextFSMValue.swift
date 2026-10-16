@@ -66,8 +66,11 @@ final class TextFSMValue {
 
     /// Only populated for `List`-typed values whose own regex has nested
     /// named groups beyond the mandatory outer one — used to re-extract
-    /// those sub-fields from the captured text at assignment time.
+    /// those sub-fields from the captured text at assignment time. Compiled
+    /// from a sanitized (ICU-safe) copy of the regex; `nestedGroupMapping`
+    /// recovers the original (possibly underscored) field names.
     private let nestedGroupRegex: NSRegularExpression?
+    private let nestedGroupMapping: [String: String]
 
     private(set) var scalar: String?
     private(set) var list: [TextFSMListEntry] = []
@@ -115,19 +118,33 @@ final class TextFSMValue {
         }
 
         let icuRegex = Self.translatePythonRegexSyntax(regex)
-        guard let compiled = try? NSRegularExpression(pattern: icuRegex) else {
+        // Validated against a SANITIZED copy — the raw regex may contain
+        // user-authored underscored named groups (common for List values
+        // with nested sub-fields), which ICU would otherwise reject outright.
+        let (sanitizedForValidation, nestedMapping) = TextFSMRegexSupport.sanitizeNamedGroups(in: icuRegex)
+        guard let compiled = try? NSRegularExpression(pattern: sanitizedForValidation) else {
             throw TextFSMTemplateError.invalidRegex(regex: regex, lineNumber: lineNumber)
         }
 
         self.name = name
         self.rawRegex = regex
         self.options = options
+        // Embeds the ORIGINAL (unsanitized) regex text — any underscored
+        // inner groups get sanitized later, when a Rule assembles this
+        // template into its own full pattern via ${Name} substitution.
         self.template = "(?<\(name)>" + icuRegex.dropFirst()
 
-        if options.contains(.list), compiled.numberOfCaptureGroups > 0 {
+        // Python's own gate is `compiled_regex.groups > 1` — group 1 is
+        // always the mandatory outer wrapping paren itself, so this only
+        // attempts nested extraction when there's genuinely more structure
+        // beyond it (matches Python's `.groups` counting ALL groups,
+        // named or not, same as `numberOfCaptureGroups` here).
+        if options.contains(.list), compiled.numberOfCaptureGroups > 1 {
             self.nestedGroupRegex = compiled
+            self.nestedGroupMapping = nestedMapping
         } else {
             self.nestedGroupRegex = nil
+            self.nestedGroupMapping = [:]
         }
     }
 
@@ -160,10 +177,10 @@ final class TextFSMValue {
                     if let match = nestedGroupRegex.firstMatch(in: matchedText, range: full),
                        match.range.location == 0 {
                         var fields: [String: String] = [:]
-                        for groupName in nestedGroupRegex.swiftmikoNamedGroupNames() {
-                            let r = match.range(withName: groupName)
+                        for (synthetic, originalName) in nestedGroupMapping {
+                            let r = match.range(withName: synthetic)
                             guard r.location != NSNotFound, let swiftRange = Range(r, in: matchedText) else { continue }
-                            fields[groupName] = String(matchedText[swiftRange])
+                            fields[originalName] = String(matchedText[swiftRange])
                         }
                         if !fields.isEmpty {
                             list.append(.fields(fields))
@@ -243,22 +260,6 @@ final class TextFSMValue {
         case .none: return .unset
         case .text(let s): return .text(s)
         case .list(let l): return .list(l)
-        }
-    }
-}
-
-extension NSRegularExpression {
-    private static let namedGroupExtractor = try! NSRegularExpression(pattern: #"\(\?<([A-Za-z0-9_]+)>"#)
-
-    /// Foundation exposes no public API to enumerate a compiled regex's
-    /// named groups, so this re-scans the original pattern text (which
-    /// `NSRegularExpression.pattern` always returns verbatim) for
-    /// `(?<name>` occurrences instead.
-    func swiftmikoNamedGroupNames() -> [String] {
-        let range = NSRange(pattern.startIndex..., in: pattern)
-        return Self.namedGroupExtractor.matches(in: pattern, range: range).compactMap { match in
-            guard let r = Range(match.range(at: 1), in: pattern) else { return nil }
-            return String(pattern[r])
         }
     }
 }

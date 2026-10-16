@@ -352,12 +352,17 @@ public func getTemplateDir(skipPackage: Bool = false) throws -> String {
 // MARK: - Structured-data parser adapters
 
 public protocol TextFSMParserAdapter {
+    /// Returns one dictionary per parsed row. Values are `String` for
+    /// plain TextFSM values, or `[Any]` (of `String`/`[String: String]`
+    /// elements) for `List`-typed values — matches real textfsm's own
+    /// mixed-type row shape, which `NativeTextFSMParser` (Sources/TextFSM/)
+    /// implements faithfully.
     func parse(
         rawOutput: String,
         platform: String?,
         command: String?,
         template: String?
-    ) throws -> [[String: String]]
+    ) throws -> [[String: Any]]
 }
 
 public protocol TTPParserAdapter {

@@ -131,8 +131,33 @@ final class TextFSMTests: XCTestCase {
         XCTAssertEqual(clearRows[1]["A"] as? String, "", "A has no Filldown, so Clear wipes it")
         XCTAssertEqual(clearRows[1]["B"] as? String, "2", "B is Filldown, so it survives Clear")
 
-        let clearallRows = try template.parseTextToDicts("A=1\nB=2\nRECORD\nCLEARALL\nRECORD\n")
+        // A second bare "RECORD" right after Clearall, with nothing
+        // reassigned, would make an entirely-blank row — which real
+        // textfsm (correctly) drops rather than recording empty
+        // placeholders, same as the implicit end-of-input record. Setting
+        // A again keeps the row non-blank so Clearall's effect on B (the
+        // Filldown value) is actually observable here.
+        let clearallRows = try template.parseTextToDicts("A=1\nB=2\nRECORD\nCLEARALL\nA=3\nRECORD\n")
+        XCTAssertEqual(clearallRows.count, 2)
+        XCTAssertEqual(clearallRows[1]["A"] as? String, "3")
         XCTAssertEqual(clearallRows[1]["B"] as? String, "", "Clearall wipes Filldown's saved state too")
+    }
+
+    /// A row where every value is empty/unset is dropped silently,
+    /// regardless of whether a `Record` action or the implicit
+    /// end-of-input record triggered it — mirrors `_AppendRecord`'s
+    /// `cur_record.count(None) + cur_record.count([])` check exactly.
+    func testEntirelyBlankRecordIsDropped() throws {
+        let template = try TextFSMTemplate(templateString: """
+        Value A (\\d+)
+
+        Start
+          ^A=${A}$$
+          ^RECORD$$ -> Record
+        """)
+
+        XCTAssertEqual(try template.parseTextToDicts("RECORD\n").count, 0)
+        XCTAssertEqual(try template.parseTextToDicts("").count, 0)
     }
 
     /// `Required` drops the whole record (silently, not an error) when

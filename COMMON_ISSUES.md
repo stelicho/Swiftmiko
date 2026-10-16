@@ -143,11 +143,44 @@ for the implementation.
 using it throws at encrypt/decrypt time. Use `aes128`. See
 [`ENCRYPTION_HANDLING.md`](./ENCRYPTION_HANDLING.md).
 
-### No TextFSM, Genie, or TTP
+### TextFSM: native, works with real ntc-templates. Genie and TTP: not implemented
 
-`sendCommand`/`sendCommandTiming` always return a plain `String`.
-There's no structured-output parsing layer ported from Netmiko yet —
-parse the raw text yourself.
+`sendCommand`/`sendCommandTiming` still always return a plain `String` —
+structured parsing is opt-in, not automatic the way Netmiko's
+`use_textfsm=True` is.
+
+**TextFSM** (`Sources/TextFSM/`) is a full native Swift port of Google's
+textfsm — not a simplified dialect, it runs real, unmodified
+[ntc-templates](https://github.com/networktocode/ntc-templates) files
+directly, with no Python involved:
+
+```swift
+let template = try TextFSMTemplate(
+    templateString: try String(contentsOfFile: "cisco_ios_show_version.textfsm")
+)
+let rows = try template.parseTextToDicts(rawShowVersionOutput)
+// rows: [[String: Any]] — one dict per record; List-typed values come
+// back as [String] or [[String: String]], matching real textfsm's own
+// mixed-type row shape.
+```
+
+Or via the existing `TextFSMParserAdapter` hook in `Utilities.swift`
+(`getStructuredDataTextFSM`/`structuredDataConverter`), using
+`NativeTextFSMParser()` — though that phase only supports an explicit
+`template:` file path; `platform`/`command` → template auto-selection
+(ntc-templates' own `index` file, the same mechanism Netmiko's
+`CliTable` uses) isn't wired up yet, so pass `template:` explicitly.
+
+**Genie** has no generic engine to port in the first place — every
+pyATS/Genie parser is its own hand-written Python class with bespoke
+regex logic, not a declarative template read by a shared interpreter.
+There's no realistic "native Swift Genie" short of hand-translating
+thousands of individual parsers.
+
+**TTP** is template-driven like TextFSM, so it's feasible, but with a
+richer Jinja-like DSL and a smaller real-world template ecosystem than
+ntc-templates — not implemented, lower priority if anyone wants to
+pick it up.
 
 ### Building from source
 

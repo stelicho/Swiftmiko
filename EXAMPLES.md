@@ -52,7 +52,7 @@ this repo for complete, larger programs.
 - [Terminal server and redispatch](#terminal-server-and-redispatch)
 
 #### Parsers
-- [A note on TextFSM/Genie/TTP](#a-note-on-textfsmgenietp)
+- [Structured output with TextFSM](#structured-output-with-textfsm)
 
 <br />
 
@@ -93,13 +93,13 @@ print(SSHDispatcher.scpPlatforms)    // every deviceType with SCP support
 ```
 
 `SSHDispatcher.defaultConnectionFactories` (`Sources/SSHDispatcher.swift`)
-registers essentially every vendor driver ported under `Sources/` — see
-`PLATFORMS.md` for the full platform list and current per-platform
-testing status. A handful of `deviceType` strings that appear in
-Netmiko but have no Swift driver ported yet (e.g. `huawei_olt`,
-`fiberstore_fsosv2`) are intentionally left unregistered rather than
-guessed at; if you hit one of those, port the driver first (see
-`VENDOR.md`) or register a stand-in yourself:
+registers every vendor driver ported under `Sources/`, plus the
+handful of `deviceType` strings that are pure aliases to another
+driver's class rather than a distinct one of their own — see
+`PLATFORMS.md` and `COMMON_ISSUES.md` for the full platform list,
+current per-platform testing status, and that alias list. If a
+`deviceType` you expect still doesn't resolve, port the driver first
+(see `VENDOR.md`) or register a stand-in yourself:
 
 ```swift
 await DispatcherRegistry.shared.registerConnection("some_new_device") {
@@ -338,8 +338,10 @@ let profile = ConnectionProfile(
 let connection = try await SSHDispatcher.connectHandler(profile: profile) as! CiscoBaseConnection
 
 var output = try await connection.sendConfigSet(["logging buffered 100000"])
-// commit() for Cisco XR/Juniper Junos/Palo Alto is not yet ported (see
-// PLATFORMS.md); saveConfig() covers everything else, e.g. Cisco IOS:
+// saveConfig() covers platforms like Cisco IOS with no commit-based
+// workflow. Cisco XR, Juniper Junos, and Palo Alto PAN-OS instead use
+// commit() on their own driver subclass (CiscoXrBase/JuniperSSH/
+// PaloAltoPanosBase) — see JuniperDemo/PaloAltoDemo under Examples/.
 output += try await connection.saveConfig()
 await connection.disconnect()
 
@@ -450,9 +452,9 @@ from the device, not what was sent.
 ## Standard logging
 
 Every `BaseConnection` carries a `SwiftmikoLogger` (see
-`Sources/BaseConnection.swift`) that prints `TRACE`/`DEBUG`/`INFO`/`WARNING`
-lines labeled with `logLabel`. Pass a custom label, or disable it
-entirely, at construction time:
+`Sources/BaseConnection.swift`) backed by swift-log's `Logger`, emitting
+`trace`/`debug`/`info`/`warning` lines labeled with `logLabel`. Pass a
+custom label, or disable it entirely, at construction time:
 
 ```swift
 let profile = ConnectionProfile(
@@ -467,10 +469,12 @@ let connection = CiscoIOSSSH(
 )
 ```
 
-This is deliberately minimal compared to Netmiko's `logging`
-integration — there's no handler/formatter configuration surface yet.
-If you need structured logs, wrap `swift-log` around the connection
-at the call site instead of relying on `SwiftmikoLogger`.
+Because the backend is a real `Logger`, output destination and
+format follow whatever your app configures via
+`LoggingSystem.bootstrap(_:)` — standard swift-log convention, same as
+any other library's logger. Without any bootstrap call, swift-log's
+own default (`StreamLogHandler.standardError`) still prints, so this
+works out of the box, but note it's **stderr**, not stdout.
 
 <br />
 
@@ -702,11 +706,44 @@ something with an actual CLI.
 
 <br />
 
-## A note on TextFSM/Genie/TTP
+## Structured output with TextFSM
 
-Netmiko's `use_textfsm=`/`use_genie=`/`use_ttp=` structured-output
-parsers have no Swift equivalent in this project yet — there is no
-TextFSM/Genie/TTP template engine ported. `sendCommand` always
-returns a plain `String`; parsing that into structured data is
-currently left to the caller (regular expressions, or your own
-`Codable`-driven parsing on top of the raw text).
+`sendCommand` itself always returns a plain `String` — there's no
+`use_textfsm=` flag on it the way Netmiko has. But `Sources/TextFSM/`
+is a full native Swift port of Google's textfsm, and it runs real,
+unmodified [ntc-templates](https://github.com/networktocode/ntc-templates)
+files directly, no Python involved:
+
+```swift
+import Swiftmiko
+
+let profile = ConnectionProfile(
+    host: "cisco1.lasthop.io", deviceType: "cisco_ios",
+    username: "pyclass", auth: .password(readSecurely("Password: "))
+)
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+let rawOutput = try await connection.sendCommand("show version")
+await connection.disconnect()
+
+let templateText = try String(
+    contentsOfFile: "/path/to/ntc-templates/cisco_ios_show_version.textfsm"
+)
+let template = try TextFSMTemplate(templateString: templateText)
+let rows = try template.parseTextToDicts(rawOutput)
+// rows: [[String: Any]] — one dict per record; List-typed values come
+// back as [String] or [[String: String]], matching real textfsm's own
+// mixed-type row shape.
+print(rows.first?["VERSION"] as Any)
+```
+
+Or through the `TextFSMParserAdapter` hook that `getStructuredDataTextFSM`/
+`structuredDataConverter` (`Sources/Utilities.swift`) already expect,
+using `NativeTextFSMParser()` — that phase only supports an explicit
+`template:` file path, though; `platform`/`command` → template
+auto-selection (ntc-templates' own `index` file) isn't wired up yet.
+
+**Genie and TTP** have no native Swift implementation. Genie's parsers
+are hand-written Python classes with no generic template engine to
+port in the first place; TTP is template-driven like TextFSM but with
+a smaller real-world template ecosystem, and hasn't been a priority.
+See [`COMMON_ISSUES.md`](./COMMON_ISSUES.md) for the full rundown.
