@@ -18,9 +18,9 @@
 //  This revision folds in the highest-frequency gaps surfaced across
 //  the full vendor-driver translation pass — the items that came up
 //  in five, six, sometimes ten separate driver files rather than
-//  one-offs. It does NOT attempt to close every backlog item; see the
-//  "Deferred" list at the bottom of this file for what's intentionally
-//  left for a future pass, and why.
+//  one-offs. It does NOT attempt to close every backlog item — individual
+//  gaps still open are called out inline at the point they matter (e.g.
+//  enableSecretHandler below), not collected in one list.
 //
 
 import Foundation
@@ -723,8 +723,8 @@ open class BaseConnection: DeviceDriver {
     /// New hook: some drivers (Check Point Gaia) need enterEnableMode
     /// to delegate the actual secret-sending step to an overridable
     /// sub-method rather than always inlining it. Not yet wired into
-    /// the default enterEnableMode() flow above — deferred, see notes
-    /// at the bottom of this file.
+    /// the default enterEnableMode() flow above — still open, no
+    /// driver currently overrides this.
     open func enableSecretHandler(
         pattern: String,
         output: String,
