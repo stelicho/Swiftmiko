@@ -19,6 +19,10 @@
 import XCTest
 @testable import Swiftmiko
 
+#if os(Windows)
+import ucrt
+#endif
+
 final class TextFSMIndexTableTests: XCTestCase {
     // swiftlint:disable:next line_length
     private static let realIndexSlice = #"""
@@ -134,9 +138,13 @@ final class TextFSMIndexTableTests: XCTestCase {
         )
 
         let previousEnv = ProcessInfo.processInfo.environment["NET_TEXTFSM"]
-        setenv("NET_TEXTFSM", tempDir.path, 1)
+        Self.setEnvironmentVariable("NET_TEXTFSM", tempDir.path)
         defer {
-            if let previousEnv { setenv("NET_TEXTFSM", previousEnv, 1) } else { unsetenv("NET_TEXTFSM") }
+            if let previousEnv {
+                Self.setEnvironmentVariable("NET_TEXTFSM", previousEnv)
+            } else {
+                Self.unsetEnvironmentVariable("NET_TEXTFSM")
+            }
         }
 
         let parser = NativeTextFSMParser()
@@ -147,5 +155,23 @@ final class TextFSMIndexTableTests: XCTestCase {
             template: nil
         )
         XCTAssertEqual(rows as? [[String: String]], [["VERSION": "15.0(2)SE10"]])
+    }
+
+    /// setenv/unsetenv aren't available on Windows (ucrt uses _putenv_s
+    /// instead) — same pattern swift-nio's own test suite uses for this.
+    private static func setEnvironmentVariable(_ name: String, _ value: String) {
+        #if os(Windows)
+        _ = _putenv_s(name, value)
+        #else
+        setenv(name, value, 1)
+        #endif
+    }
+
+    private static func unsetEnvironmentVariable(_ name: String) {
+        #if os(Windows)
+        _ = _putenv_s(name, "")
+        #else
+        unsetenv(name)
+        #endif
     }
 }
