@@ -204,11 +204,6 @@ regex logic, not a declarative template read by a shared interpreter.
 There's no realistic "native Swift Genie" short of hand-translating
 thousands of individual parsers.
 
-**TTP** is template-driven like TextFSM, so it's feasible, but with a
-richer Jinja-like DSL and a smaller real-world template ecosystem than
-ntc-templates — not implemented, lower priority if anyone wants to
-pick it up.
-
 ### Building from source
 
 Swiftmiko depends on a local fork of `swift-nio-ssh`
