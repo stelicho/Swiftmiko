@@ -759,8 +759,32 @@ Netmiko: point it at a directory containing (or whose `templates/`
 subdirectory contains) the `index` file, or it falls back to
 `~/ntc-templates/ntc_templates/templates`.
 
-**Genie and TTP** have no native Swift implementation. Genie's parsers
-are hand-written Python classes with no generic template engine to
-port in the first place; TTP is template-driven like TextFSM but with
-a smaller real-world template ecosystem, and hasn't been a priority.
-See [`COMMON_ISSUES.md`](./COMMON_ISSUES.md) for the full rundown.
+**TTP** (`Sources/TTP/`) has a core-subset native port: `<group>` tags
+(nested, with the trailing-`*` list marker) and `{{ variable }}` /
+`{{ variable | FORMATTER }}` extraction (`ORPHRASE`, `DIGIT`, `WORD`,
+`IP`) — verified against the real `ttp` package's actual output, not
+just its docs:
+
+```swift
+let template = try TTPTemplate(templateString: """
+<group name="interfaces*">
+interface {{ interface }}
+ ip address {{ ip }}
+</group>
+""")
+let rows = TTPExecution.parse(template: template, rawText: rawShowRunOutput)
+print(rows.first?["interfaces"] as Any)
+```
+
+Or through `NativeTTPParser()` and the `TTPParserAdapter` hook
+(`getStructuredDataTTP`/`structuredDataConverter`), the same pattern as
+`NativeTextFSMParser()` above — `template:` there is a file path.
+Macros (arbitrary embedded Python), outputs/savers, lookup tables, and
+Jinja2-style dynamic templating are deliberately not implemented —
+there's no honest Swift equivalent for macros in particular, and any
+other tag throws a clear error rather than silently mis-parsing it.
+
+**Genie** has no native Swift implementation — its parsers are
+hand-written Python classes with no generic template engine to port in
+the first place. See [`COMMON_ISSUES.md`](./COMMON_ISSUES.md) for the
+full rundown.

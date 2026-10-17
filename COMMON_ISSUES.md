@@ -139,7 +139,7 @@ offers before assuming this is the cause — see
 `Sources/swift-nio-ssh/Sources/NIOSSH/Key Exchange/ClassicDiffieHellmanKeyExchange.swift`
 for the implementation.
 
-### TextFSM: native, works with real ntc-templates. Genie and TTP: not implemented
+### TextFSM and TTP: native, core-subset for TTP. Genie: not implemented
 
 `sendCommand`/`sendCommandTiming` still always return a plain `String` —
 structured parsing is opt-in, not automatic the way Netmiko's
@@ -176,6 +176,27 @@ templates to be joined (e.g. `show module` on `cisco_ios`/`cisco_asa`)
 — that join isn't implemented, so those specific rows throw a clear
 error rather than silently merging or dropping data; pass an explicit
 `template:` for one of them instead.
+
+**TTP** (`Sources/TTP/`) is a core-subset native port, verified against
+the real `ttp` Python package's actual behavior (not just its docs):
+`<group>` tags (nested, with the trailing-`*` list-output marker) and
+`{{ variable }}` / `{{ variable | FORMATTER }}` extraction, where
+`FORMATTER` is one of `ORPHRASE`, `DIGIT`, `WORD`, or `IP`. Deliberately
+**not** implemented: macros (arbitrary embedded Python — no honest
+Swift equivalent), outputs/savers, lookup tables, and Jinja2-style
+dynamic templating; any other tag throws a clear error rather than
+silently mis-parsing it. Use it the same way as TextFSM, via
+`NativeTTPParser()` and the `TTPParserAdapter` hook
+(`getStructuredDataTTP`/`structuredDataConverter` in `Utilities.swift`),
+or directly:
+
+```swift
+let template = try TTPTemplate(templateString: try String(contentsOfFile: "interfaces.ttp"))
+let rows = TTPExecution.parse(template: template, rawText: rawShowRunOutput)
+// rows: [[String: Any]] — nested <group>s attach as [String: Any] (single
+// match, no trailing "*") or [[String: Any]] (list), omitted entirely
+// from a record if that group never matched anything for it.
+```
 
 **Genie** has no generic engine to port in the first place — every
 pyATS/Genie parser is its own hand-written Python class with bespoke
