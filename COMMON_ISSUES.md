@@ -46,9 +46,11 @@ let connection = CiscoIOSSSH(
 For lower-level `TRACE`/`DEBUG` output about what the driver itself
 is doing (not just what's on the wire), every `BaseConnection` also
 has a `SwiftmikoLogger`, controlled by the `logLabel`/`loggerEnabled`
-initializer parameters. It's deliberately minimal — there's no
-`swift-log` backend wiring yet, just `print()` — so don't expect
-Netmiko's `logging.basicConfig()`-style configurability.
+initializer parameters. It's backed by real `swift-log` (see
+`Sources/BaseConnection.swift`), so the embedding app controls
+format/destination/level the normal swift-log way via
+`LoggingSystem.bootstrap(_:)`; without a bootstrap call it falls back
+to swift-log's own default handler, which prints to stderr.
 
 ### Does Swiftmiko support connecting via a terminal server?
 
