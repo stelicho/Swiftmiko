@@ -738,9 +738,26 @@ print(rows.first?["VERSION"] as Any)
 
 Or through the `TextFSMParserAdapter` hook that `getStructuredDataTextFSM`/
 `structuredDataConverter` (`Sources/Utilities.swift`) already expect,
-using `NativeTextFSMParser()` — that phase only supports an explicit
-`template:` file path, though; `platform`/`command` → template
-auto-selection (ntc-templates' own `index` file) isn't wired up yet.
+using `NativeTextFSMParser()`:
+
+```swift
+setenv("NET_TEXTFSM", "/path/to/ntc-templates/ntc_templates/templates", 1)
+let rows = try getStructuredDataTextFSM(
+    rawOutput: rawOutput,
+    platform: "cisco_ios",
+    command: "show version",
+    parser: NativeTextFSMParser()
+)
+```
+
+Omitting `template:` and passing `platform`/`command` instead
+auto-selects the template from ntc-templates' own `index` file —
+`TextFSMIndexTable` (`Sources/TextFSM/TextFSMIndexTable.swift`) reads
+it unmodified, same first-match-wins-in-file-order lookup as
+Netmiko's `CliTable`. `NET_TEXTFSM` works the same way it does for
+Netmiko: point it at a directory containing (or whose `templates/`
+subdirectory contains) the `index` file, or it falls back to
+`~/ntc-templates/ntc_templates/templates`.
 
 **Genie and TTP** have no native Swift implementation. Genie's parsers
 are hand-written Python classes with no generic template engine to

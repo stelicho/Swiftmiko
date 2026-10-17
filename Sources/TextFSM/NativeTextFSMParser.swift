@@ -15,11 +15,11 @@
 //  to the TextFSMParserAdapter protocol declared in Utilities.swift, so
 //  it plugs directly into getStructuredDataTextFSM()/structuredDataConverter().
 //
-//  Scope note: this phase only supports an explicit template file path —
-//  the platform+command -> template auto-selection ntc-templates' own
-//  `index` file provides (the same mechanism Netmiko's CliTable uses) is
-//  not implemented yet. Passing platform/command without an explicit
-//  template throws a clear error rather than silently guessing.
+//  When no explicit template is given, platform+command -> template
+//  auto-selection uses ntc-templates' own `index` file via
+//  TextFSMIndexTable — the same mechanism Netmiko's CliTable/ntc_templates
+//  use — located the same way Netmiko finds it (NET_TEXTFSM env var, or
+//  ~/ntc-templates/ntc_templates/templates, via getTemplateDirectory()).
 //
 
 import Foundation
@@ -31,9 +31,8 @@ public enum NativeTextFSMParserError: Error, CustomStringConvertible, Sendable {
     public var description: String {
         switch self {
         case .noTemplateSpecified:
-            return "NativeTextFSMParser requires an explicit template file path. " +
-                "platform/command -> template auto-selection (ntc-templates' index file) " +
-                "is not implemented yet."
+            return "NativeTextFSMParser requires either an explicit template file path " +
+                "or both platform and command for index-based auto-selection."
         case .templateFileNotFound(let path):
             return "TextFSM template file not found: \(path)"
         }
@@ -44,6 +43,9 @@ public enum NativeTextFSMParserError: Error, CustomStringConvertible, Sendable {
 /// engine — no Python, no shelling out, works directly against real
 /// ntc-templates `.textfsm` files.
 public final class NativeTextFSMParser: TextFSMParserAdapter {
+    private static let indexCacheLock = NSLock()
+    private static var indexCache: [String: TextFSMIndexTable] = [:]
+
     public init() {}
 
     public func parse(
@@ -52,8 +54,17 @@ public final class NativeTextFSMParser: TextFSMParserAdapter {
         command: String?,
         template: String?
     ) throws -> [[String: Any]] {
-        guard let templatePath = template else {
-            throw NativeTextFSMParserError.noTemplateSpecified
+        let templatePath: String
+        if let template {
+            templatePath = template
+        } else {
+            guard let platform, let command else {
+                throw NativeTextFSMParserError.noTemplateSpecified
+            }
+            let directory = try getTemplateDirectory()
+            let index = try Self.cachedIndex(templateDirectory: directory)
+            let resolved = try index.template(forPlatform: platform, command: command)
+            templatePath = "\(directory)/\(try Self.resolveSingleTemplateName(resolved))"
         }
         guard FileManager.default.fileExists(atPath: templatePath) else {
             throw NativeTextFSMParserError.templateFileNotFound(templatePath)
@@ -61,5 +72,31 @@ public final class NativeTextFSMParser: TextFSMParserAdapter {
         let templateString = try String(contentsOfFile: templatePath, encoding: .utf8)
         let parsedTemplate = try TextFSMTemplate(templateString: templateString)
         return try parsedTemplate.parseTextToDicts(rawOutput)
+    }
+
+    /// An index row's Template column is colon-separated when ntc-templates
+    /// wants several tables joined for one command (e.g. multiple `show
+    /// module` variants) — rejected explicitly rather than silently
+    /// merged or dropped, since that join isn't implemented.
+    static func resolveSingleTemplateName(_ resolved: String) throws -> String {
+        let names = resolved.split(separator: ":").map(String.init)
+        guard names.count == 1 else {
+            throw TextFSMIndexError.multiTemplateRowNotSupported(templates: names)
+        }
+        return names[0]
+    }
+
+    /// Index files are parsed once per template directory and reused —
+    /// matches CliTable's own class-level `INDEX` cache, since ntc-templates'
+    /// real index file has ~1000 rows and is otherwise re-parsed on every call.
+    private static func cachedIndex(templateDirectory: String) throws -> TextFSMIndexTable {
+        indexCacheLock.lock()
+        defer { indexCacheLock.unlock() }
+        if let cached = indexCache[templateDirectory] {
+            return cached
+        }
+        let index = try TextFSMIndexTable(filePath: "\(templateDirectory)/index")
+        indexCache[templateDirectory] = index
+        return index
     }
 }

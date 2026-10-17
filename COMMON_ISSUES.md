@@ -162,10 +162,20 @@ let rows = try template.parseTextToDicts(rawShowVersionOutput)
 
 Or via the existing `TextFSMParserAdapter` hook in `Utilities.swift`
 (`getStructuredDataTextFSM`/`structuredDataConverter`), using
-`NativeTextFSMParser()` — though that phase only supports an explicit
-`template:` file path; `platform`/`command` → template auto-selection
-(ntc-templates' own `index` file, the same mechanism Netmiko's
-`CliTable` uses) isn't wired up yet, so pass `template:` explicitly.
+`NativeTextFSMParser()`. `platform`/`command` → template
+auto-selection also works now, the same way Netmiko's `CliTable`
+does it: point `NET_TEXTFSM` at an ntc-templates checkout (or
+`~/ntc-templates/ntc_templates/templates`, same fallback Netmiko
+uses) and omit `template:` — `TextFSMIndexTable`
+(`Sources/TextFSM/TextFSMIndexTable.swift`) reads the real `index`
+file unmodified, including its `[[completion]]` syntax and regex
+Platform/Command columns, and resolves the template the same
+first-match-wins-in-file-order way `IndexTable.GetRowMatch` does.
+One real gap: a handful of index rows map one command to *several*
+templates to be joined (e.g. `show module` on `cisco_ios`/`cisco_asa`)
+— that join isn't implemented, so those specific rows throw a clear
+error rather than silently merging or dropping data; pass an explicit
+`template:` for one of them instead.
 
 **Genie** has no generic engine to port in the first place — every
 pyATS/Genie parser is its own hand-written Python class with bespoke
