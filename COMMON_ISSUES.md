@@ -137,12 +137,6 @@ offers before assuming this is the cause — see
 `Sources/swift-nio-ssh/Sources/NIOSSH/Key Exchange/ClassicDiffieHellmanKeyExchange.swift`
 for the implementation.
 
-### Encryption: Fernet isn't implemented
-
-`.swiftmiko.yml`'s `__meta__.encryption_type` accepts `fernet`, but
-using it throws at encrypt/decrypt time. Use `aes128`. See
-[`ENCRYPTION_HANDLING.md`](./ENCRYPTION_HANDLING.md).
-
 ### TextFSM: native, works with real ntc-templates. Genie and TTP: not implemented
 
 `sendCommand`/`sendCommandTiming` still always return a plain `String` —

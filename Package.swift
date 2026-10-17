@@ -84,6 +84,10 @@ let package = Package(
         .testTarget(
             name: "SwiftmikoTests",
             dependencies: ["Swiftmiko"]
+        ),
+        .testTarget(
+            name: "SwiftmikoCLITests",
+            dependencies: ["SwiftmikoCLI"]
         )
     ]
 )

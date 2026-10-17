@@ -169,29 +169,27 @@ positional.
 ## Encryption: swiftmiko-encrypt and swiftmiko-bulk-encrypt
 
 For keeping passwords and secrets out of plaintext in
-`.swiftmiko.yml`. The full design (key handling, what's actually
-implemented vs. not) is in [`ENCRYPTION_HANDLING.md`](../../ENCRYPTION_HANDLING.md)
-at the repo root — this is the short version, with verified example
-output.
+`.swiftmiko.yml`. The full design (key handling, exact wire format)
+is in [`ENCRYPTION_HANDLING.md`](../../ENCRYPTION_HANDLING.md) at the
+repo root — this is the short version, with verified example output.
 
-**Only `aes128` works today.** `.swiftmiko.yml`'s `encryption_type:
-fernet` is accepted but throws at encrypt/decrypt time — always pass
-`--type aes128` / `--encryption-type aes128` explicitly, or set
-`encryption_type: aes128` in `__meta__`.
+Both `fernet` and `aes128` work and are wire-compatible with real
+Netmiko Tools — a file encrypted by one decrypts cleanly in the
+other.
 
-The key comes from `SWIFTMIKO_TOOLS_KEY` and must be exactly 16 bytes
-for AES-128 (so, for a plain ASCII string, exactly 16 characters):
+The key comes from `SWIFTMIKO_TOOLS_KEY` and can be any length — it's
+a PBKDF2 passphrase (100,000 rounds, SHA-256), not a raw AES key:
 
 ```console
 $ export SWIFTMIKO_TOOLS_KEY="0123456789abcdef"
-$ swiftmiko-encrypt "my_secure_password" --type aes128
+$ swiftmiko-encrypt "my_secure_password" --type fernet
 
-Encrypted data: xnirBG8z9aEXeg+hlVfFd/mljYIFSMTyjvShnfRkDPl87pLvQqzeEkwhHY84qw==
+Encrypted data: __encrypt__mvNljo9eU+pcQ26uZjN88A==:Z0FBQUFBQnEwNnUySkxBcmktMndUZ2RkQWdjVlBhQ3Jrck14Z1lqODFiSXRDOWp1RTZWWFhkVEQyZWd4c1lEUjhXaGpjTUttcE9CMk5SRnpHOUFiUThUNkpuOWZKN09ibGNSVVpXaFYtNzZaa0xMVVZpbWVnOHc9
 ```
 
-(Your own output will differ — AES-GCM includes a random nonce, so
-encrypting the same string twice never produces the same ciphertext.
-That's expected, not a bug.)
+(Your own output will differ — both schemes use a random salt/IV
+every time, so encrypting the same string twice never produces the
+same ciphertext. That's expected, not a bug.)
 
 Omit the data argument and it prompts for it without echoing to the
 terminal; omit `--key`/`--type` and it falls back to
@@ -204,7 +202,7 @@ once:
 $ swiftmiko-bulk-encrypt \
     --input-file Examples/CLIToolsDemo/sample.swiftmiko.yml \
     --output-file /tmp/sample.encrypted.swiftmiko.yml \
-    --encryption-type aes128
+    --encryption-type fernet
 Encrypted .swiftmiko.yml file has been written to /tmp/sample.encrypted.swiftmiko.yml
 ```
 
@@ -232,8 +230,6 @@ to resemble the input's, even for lines that didn't change.
   highlighted grep matches — using raw ANSI escape codes against a
   fixed width, not a real terminal-rendering library. Functionally
   equivalent, visually simpler.
-- **`fernet` encryption isn't implemented.** Use `aes128` everywhere;
-  see [`ENCRYPTION_HANDLING.md`](../../ENCRYPTION_HANDLING.md).
 - **Credential overrides are all-or-nothing.** `--username`/`--password`/`--secret`
   replace that field for every device targeted in one run, not a
   single device.
