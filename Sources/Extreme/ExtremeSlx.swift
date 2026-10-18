@@ -30,7 +30,7 @@ public final class ExtremeSlxSSH: CiscoSSHConnection, NoEnable {
         try await disablePaging()
     }
 
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let resolvedDelay = selectDelayFactor(delay)
         try await writeChannel(profile.returnCharacter)
         try await Task.sleep(nanoseconds: UInt64(1.0 * resolvedDelay * 1_000_000_000))

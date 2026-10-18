@@ -73,7 +73,7 @@ open class CiscoS200Base: CiscoSSHConnection {
     /// and the loop returns. Throws a detailed authentication error
     /// if none of the expected patterns ever appear within the
     /// timeout.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let usernameLabel = "Username:"
         let loginLabel = "login as"
         let passwordLabel = "ssword"

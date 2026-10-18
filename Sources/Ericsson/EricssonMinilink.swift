@@ -140,7 +140,7 @@ open class EricssonMinilinkBase: BaseConnection, NoEnable {
     /// already using the CLI — this immediately disconnects and
     /// throws rather than retrying, since a busy CLI is a different
     /// failure mode than a slow or unresponsive one.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let startTime = Date()
         var output = ""
         let timeout = profile.authTimeout

@@ -72,7 +72,7 @@ open class ExtremeErsSSH: CiscoSSHConnection {
     /// (username prompt, password prompt, "Ctrl-Y", "Press ENTER",
     /// or a menu banner) as valid next steps, in any order, until the
     /// real device prompt finally appears.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         var output = ""
         let usernameLabel = "sername"
         let passwordLabel = "ssword"

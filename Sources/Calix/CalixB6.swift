@@ -74,7 +74,7 @@ open class CalixB6Base: CiscoSSHConnection {
     /// collapsing into the other pattern for consistency — Calix B6's
     /// login banner is apparently slow enough or intermittent enough
     /// that the original authors needed this specific retry shape.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         try await Task.sleep(nanoseconds: 100_000_000)
         let startTime = Date()
         let loginTimeout: TimeInterval = 20

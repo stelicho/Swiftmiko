@@ -340,6 +340,18 @@ open class BaseConnection: DeviceDriver {
         guard let channel else { throw SwiftmikoError.noConnection }
         if !channel.isOpen { try await channel.open() }
         try await authenticate()
+        // Matches netmiko's establish_connection(), which only calls
+        // special_login_handler() on the SSH path — Telnet/Serial
+        // connections handle their own manual login via telnetLogin()
+        // instead, called from within sessionPreparation(). This
+        // matters concretely: a few "Base" classes (CalixB6Base,
+        // CiscoS200Base) share a specialLoginHandler() override
+        // between their SSH and Telnet subclasses, and the Telnet
+        // side must not run it — it would misread already-completed
+        // telnet login output as an unexpected pattern and throw.
+        if channel is NIOSSHChannel {
+            try await specialLoginHandler()
+        }
         try await sessionPreparation()
         logger.info("Connection established to \(profile.host)")
     }
@@ -658,6 +670,20 @@ open class BaseConnection: DeviceDriver {
         let lines = output.components(separatedBy: .newlines).filter { !$0.isEmpty }
         return lines.last?.trimmingCharacters(in: .whitespaces) ?? basePrompt
     }
+
+    /// Handler for devices (Cisco WLC, Extreme ERS, Calix B6, etc.)
+    /// that throw up characters, a login banner, or a manual
+    /// username/password exchange prior to the shell settling into a
+    /// normal prompt. Called once by connect(), right after the SSH
+    /// channel is open and authenticated, before sessionPreparation()
+    /// runs — a no-op by default.
+    ///
+    /// Maps to netmiko's special_login_handler(delay_factor=1.0),
+    /// which establish_connection() calls unconditionally for the SSH
+    /// protocol path specifically (Telnet/Serial instead run their own
+    /// telnet_login()/serial_login()). connect() replicates that same
+    /// SSH-only gating — see the `channel is NIOSSHChannel` check there.
+    open func specialLoginHandler(delay: TimeInterval = 1.0) async throws {}
 
     open func sessionPreparation() async throws {
         try await disablePaging()

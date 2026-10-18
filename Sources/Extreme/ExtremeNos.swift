@@ -43,7 +43,7 @@ public final class ExtremeNosSSH: CiscoSSHConnection, NoEnable {
     /// delay: send a bare return, then pause, presumably because this
     /// platform needs a moment before it's ready to accept the next
     /// command reliably.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let resolvedDelay = selectDelayFactor(delay)
         try await writeChannel(profile.returnCharacter)
         try await Task.sleep(nanoseconds: UInt64(1.0 * resolvedDelay * 1_000_000_000))

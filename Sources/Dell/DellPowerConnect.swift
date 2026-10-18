@@ -120,7 +120,7 @@ public final class DellPowerConnectSSH: DellPowerConnectBase {
     /// data, respond to labeled prompts, nudge with a bare return if
     /// nothing arrives, bounded by a fixed iteration count (13
     /// attempts here) rather than a wall-clock timeout.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let resolvedDelay = selectDelayFactor(delay)
         try await Task.sleep(nanoseconds: UInt64(resolvedDelay * 0.5 * 1_000_000_000))
 

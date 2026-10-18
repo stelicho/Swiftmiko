@@ -212,7 +212,7 @@ public class HuaweiSSH: HuaweiBase {
     /// with "Y" twice — once to continue, once to actually save —
     /// then waited on for up to 60 seconds for a "saved successfully"
     /// confirmation before proceeding).
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let data = try await readUntilPattern(pattern: promptOrPasswordChange)
 
         if data.range(of: passwordChangePrompt, options: .regularExpression) != nil {

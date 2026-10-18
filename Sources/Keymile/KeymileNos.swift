@@ -86,7 +86,7 @@ public final class KeymileNOSSSH: CiscoIOSBase {
     /// pattern this call was waiting for, so this method's own job is
     /// just to wait for the RIGHT pattern; the wrong-credential case
     /// is caught as a side effect either way.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         _ = try await testChannelRead(pattern: "(>|Login incorrect)")
     }
 }

@@ -96,7 +96,7 @@ open class MikrotikBase: CiscoSSHConnection, NoEnable, NoConfig {
     /// changing it, rather than actually picking one). Loops up to 15
     /// times, handling whichever of these appears, until the real
     /// device prompt is finally reached.
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let noLicenseMessage = "Please press \"Enter\" to continue!"
         let licensePrompt = "Do you want to see the software license"
         let newPasswordPrompt = "new password>"

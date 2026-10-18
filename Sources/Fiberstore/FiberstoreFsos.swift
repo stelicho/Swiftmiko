@@ -136,7 +136,7 @@ public final class FiberstoreFsosSSH: CiscoBaseConnection, NoEnable {
     /// shape, reinforcing it as a legitimate, recurring alternative
     /// to the wall-clock-deadline style used elsewhere (Calix B6,
     /// Extreme ERS).
-    internal func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let resolvedDelay = selectDelayFactor(delay)
 
         for _ in 0...12 {

@@ -72,7 +72,7 @@ open class RaisecomRosBase: CiscoBaseConnection {
 public final class RaisecomRosSSH: RaisecomRosBase {
 
     /// Walk the special Login:/Password: handshake seen on certain OS versions.
-    public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
+    override public func specialLoginHandler(delay: TimeInterval = 1.0) async throws {
         let activeDelay = selectDelayFactor(delay)
         try await Task.sleep(nanoseconds: UInt64(activeDelay * 0.5 * 1_000_000_000))
 
