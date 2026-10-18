@@ -25,6 +25,10 @@ import Foundation
 /// config-mode concept beyond entering tmsh itself — hence NoConfig.
 public final class F5TmshSSH: BaseConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

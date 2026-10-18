@@ -36,6 +36,26 @@ import Foundation
 /// commands are allowed to echo verification output.
 public final class AdvaAosFsp150F3SSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    // MARK: Config Mode
+    //
+    // Deliberately does NOT override supportsConfigMode: disablePaging()
+    // below needs sendConfigSet() to keep working (both override it to
+    // call super with enterConfigMode: false), and supportsConfigMode
+    // gates sendConfigSet() too, not just enterConfigMode(). What
+    // actually needs to be a no-op is enterConfigMode() itself —
+    // CiscoBaseConnection's inherited implementation sends a real
+    // "configure terminal" and waits for a prompt this device never
+    // produces; F3's real config navigation goes through plain commands
+    // like "configure user-security", not a distinct config mode.
+    @discardableResult
+    override public func enterConfigMode(
+        command: String = "",
+        pattern: String = "",
+        dotAll: Bool = false
+    ) async throws -> String {
+        ""
+    }
+
     /// Same "\r\n" line-ending requirement as F2.
     /// Maps to netmiko's __init__ override.
     public init(

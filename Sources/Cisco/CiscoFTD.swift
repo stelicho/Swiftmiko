@@ -41,6 +41,10 @@ import Logging
 /// throw notImplemented — FTD policy is managed through FMC or FDM.
 public final class CiscoFtdSSH: CiscoSSHConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: - State
 
     /// Tracks whether we are currently inside the diagnostic CLI subprocess.

@@ -178,12 +178,35 @@ public final class DellIsilonSSH: BaseConnection {
         return output
     }
 
+    /// Exit the root shell, restoring the normal "$"-terminated prompt.
+    ///
     /// Maps to netmiko's exit_enable_mode(exit_command="exit").
+    ///
+    /// BaseConnection.exitEnableMode() has no real implementation (it
+    /// unconditionally throws notImplemented), and this class extends
+    /// BaseConnection directly, so `super` can't be delegated to here
+    /// — same reasoning as enterEnableMode() above not calling through
+    /// the base parameterized flow. Mirrors enterEnableMode()'s own
+    /// structure in reverse: send the exit command, wait for the
+    /// normal prompt terminator, then re-apply setPrompt() with "$"
+    /// since leaving root changes the effective prompt terminator zsh
+    /// would otherwise show.
     @discardableResult
     override public func exitEnableMode(
         exitCommand: String = "exit"
     ) async throws -> String {
-        return try await super.exitEnableMode(exitCommand: exitCommand)
+        guard try await isInEnableMode() else { return "" }
+
+        let delay = selectDelayFactor(1.0)
+        try await writeChannel(normalizeCommand(exitCommand))
+        let output = try await readUntilPattern(pattern: #"\$.*$"#)
+        try await Task.sleep(nanoseconds: UInt64(1.0 * delay * 1_000_000_000))
+        try await setPrompt(terminator: "$")
+
+        guard try await !isInEnableMode() else {
+            throw SwiftmikoError.commandFailed("Failed to exit enable mode.")
+        }
+        return output
     }
 
     // MARK: Config Mode — Aliased to Enable Mode

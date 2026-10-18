@@ -24,6 +24,10 @@ import Foundation
 /// carriage return.
 public final class AccedianSSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

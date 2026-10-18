@@ -62,7 +62,7 @@ open class FurukawaFitelnetBase: CiscoBaseConnection {
     /// avoids that false match.
     @discardableResult
     override public func telnetLogin(
-        primaryTerminator: String = #"\#\s*$"#,
+        primaryTerminator: String = #"#\s*$"#,
         altTerminator: String = #">\s*$"#,
         usernamePattern: String = #"(?:user:|username|login|user name)"#,
         passwordPattern: String = #"assword:\s*$"#,

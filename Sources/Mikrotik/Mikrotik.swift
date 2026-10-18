@@ -26,6 +26,10 @@ import Foundation
 /// terminal rendering.
 open class MikrotikBase: CiscoSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     override public nonisolated var promptPattern: String { #"\].*>"# }
 
     /// MikroTik requires "\r\n" as the line ending.

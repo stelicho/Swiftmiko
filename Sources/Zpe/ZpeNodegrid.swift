@@ -32,6 +32,10 @@ import Foundation
 /// entirely unlike the Nodegrid one — see shellPromptPattern below.
 public final class ZpeNodegridSSH: LinuxSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Prompt Patterns
 
     /// Matches both staged and unstaged Nodegrid prompts:

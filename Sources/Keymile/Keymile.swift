@@ -22,6 +22,10 @@ import Foundation
 /// connection type — hence NoEnable + NoConfig.
 public final class KeymileSSH: CiscoIOSBase, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     /// Keymile requires "\r\n" as the line ending.
     /// Maps to netmiko's __init__ override:
     ///     kwargs.setdefault("default_enter", "\r\n")

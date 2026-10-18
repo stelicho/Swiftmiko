@@ -720,11 +720,15 @@ open class BaseConnection: DeviceDriver {
         )
     }
 
-    /// New hook: some drivers (Check Point Gaia) need enterEnableMode
-    /// to delegate the actual secret-sending step to an overridable
-    /// sub-method rather than always inlining it. Not yet wired into
-    /// the default enterEnableMode() flow above — still open, no
-    /// driver currently overrides this.
+    /// Hook some drivers (Check Point Gaia) need: enterEnableMode
+    /// delegates the actual secret-sending step to this overridable
+    /// sub-method rather than always inlining it. Not wired into the
+    /// default enterEnableMode() flow above — the default flow throws
+    /// notImplemented outright, since BaseConnection itself has no
+    /// generic enable-mode implementation (see CiscoBaseConnection's
+    /// override for one that does). Drivers that extend BaseConnection
+    /// directly and need this hook (CheckPointGaiaSSH is the only one
+    /// so far) override enterEnableMode() to call it explicitly.
     open func enableSecretHandler(
         pattern: String,
         output: String,

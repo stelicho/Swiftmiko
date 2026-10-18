@@ -26,6 +26,10 @@ import Foundation
 /// call, not just once during session prep.
 open class ExtremeExosBase: CiscoSSHConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

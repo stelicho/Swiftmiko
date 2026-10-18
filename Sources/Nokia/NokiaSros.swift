@@ -208,11 +208,11 @@ open class NokiaSros: BaseConnection {
     ) async throws -> String {
         var output = ""
         var resolvedPattern = pattern
-        var dotAll = false
+        var resolvedDotAll = dotAll
 
         if resolvedPattern.isEmpty {
             resolvedPattern = #"\(ex\)\[.*"# + basePrompt + #".*$"#
-            dotAll = true
+            resolvedDotAll = true
         }
 
         // Only model-driven CLI supports config mode at all.
@@ -220,7 +220,7 @@ open class NokiaSros: BaseConnection {
             output += try await super.enterConfigMode(
                 command: command,
                 pattern: resolvedPattern,
-                dotAll: dotAll
+                dotAll: resolvedDotAll
             )
         }
         return output

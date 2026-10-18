@@ -26,6 +26,10 @@ import Foundation
 /// than left changed.
 public final class FortinetSSH: CiscoSSHConnection, NoConfig, NoEnable {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     override public nonisolated var promptPattern: String { "[#$]" }
 
     /// SSH key-exchange algorithms Fortinet devices are known to

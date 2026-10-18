@@ -22,6 +22,10 @@ import Foundation
 /// NoConfig.
 public final class NetscalerSSH: BaseConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

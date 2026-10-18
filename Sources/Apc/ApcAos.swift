@@ -21,6 +21,10 @@ import Foundation
 /// Cisco-family lineage at all, similar to SmartOpticsDWDM.
 public final class ApcAosSSH: BaseConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

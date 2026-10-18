@@ -21,6 +21,10 @@ import Foundation
 /// platform — hence NoEnable + NoConfig.
 public final class AlcatelAosSSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

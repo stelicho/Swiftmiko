@@ -36,6 +36,10 @@ import Foundation
 /// responsibility to track context depth.
 public final class AdvaAosFsp150F2SSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     /// Adva devices require "\r\n" as the line ending for proper
     /// operation — this is forced unless the caller's profile
     /// already specifies a return character explicitly.

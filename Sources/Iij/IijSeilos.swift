@@ -21,6 +21,10 @@ import Foundation
 /// this connection type — hence NoEnable + NoConfig.
 open class IIJSeilosBase: BaseConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's session_preparation().

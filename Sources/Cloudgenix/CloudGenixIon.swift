@@ -25,6 +25,25 @@ import Foundation
 /// settling.
 public final class CloudGenixIonSSH: CiscoSSHConnection, NoConfig {
 
+    // MARK: Config Mode
+    //
+    // Deliberately does NOT override supportsConfigMode: sendConfigSet()
+    // below is meant to keep working (it's always called with
+    // enterConfigMode: false), and supportsConfigMode gates sendConfigSet()
+    // too, not just enterConfigMode(). What actually needs to be a no-op
+    // is enterConfigMode() itself — CiscoBaseConnection's inherited
+    // implementation sends a real "configure terminal" and waits for a
+    // prompt this device never produces, contradicting the "no real
+    // config-mode transition ever occurs" contract documented below.
+    @discardableResult
+    override public func enterConfigMode(
+        command: String = "",
+        pattern: String = "",
+        dotAll: Bool = false
+    ) async throws -> String {
+        ""
+    }
+
     // MARK: Connection Establishment
 
     /// Establish the SSH connection with CloudGenix's specific

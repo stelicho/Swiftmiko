@@ -15,9 +15,27 @@
 //  Created by KK Campbell on 9/3/26.
 //
 // CiscoWLC.swift
-public class CiscoWlcSSH: BaseConnection {
+//
+// Was `BaseConnection` directly, which has no working disablePaging()
+// default (throws notImplemented) — every call to connect() failed
+// immediately in sessionPreparation() before specialLoginHandler()
+// below could ever run. CiscoBaseConnection provides a real
+// disablePaging() ("terminal length 0"), matching every other
+// Cisco-family driver that doesn't need vendor-specific paging logic.
+public class CiscoWlcSSH: CiscoBaseConnection {
 
-    // Called during the connection phase, before sessionPreparation.
+    /// Maps to netmiko's session_preparation() — runs
+    /// specialLoginHandler() first (WLC's login banner must be
+    /// handled before the normal prompt-detection flow runs), then
+    /// the standard Cisco prep sequence.
+    override public func sessionPreparation() async throws {
+        try await specialLoginHandler()
+        try await testChannelRead(pattern: "[>#]")
+        try await setBasePrompt()
+        try await disablePaging()
+    }
+
+    // Called during sessionPreparation, before prompt detection.
     // Handles WLC's non-standard login banner sequence.
     func specialLoginHandler() async throws {
         let promptPattern = #"(?m:[>#]\s*$)"#

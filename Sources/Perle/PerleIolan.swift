@@ -28,6 +28,10 @@ import Foundation
 /// level rather than leaving it entirely to the caller.
 public final class PerleIolanSSH: CiscoBaseConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     /// Perle requires a bare "\r" line ending.
     /// Maps to netmiko's __init__ override:
     ///     self.default_enter = kwargs.get("default_enter", "\r")

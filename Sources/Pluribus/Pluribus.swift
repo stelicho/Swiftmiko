@@ -19,6 +19,10 @@ import Foundation
 /// No configuration mode via this connection — hence NoConfig.
 public final class PluribusSSH: BaseConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     /// Maps to netmiko's __init__ override:
     ///     super().__init__(*args, **kwargs)
     ///     self._config_mode = False

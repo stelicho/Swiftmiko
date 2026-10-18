@@ -13,6 +13,28 @@ import Foundation
 // Avara AOS SSH Driver for Netmiko.
 open class AvaraAosSSH: CiscoSSHConnection {
 
+    // Example prompts:
+    //   User:   `DEVNAME % `
+    //   Config: `DEVNAME* % `
+    // Maps to netmiko's prompt_pattern = r"\w\s%". The inherited
+    // CiscoBaseConnection default ("[>#]") never matches this
+    // device's real "%"-terminated prompt, which would otherwise hang
+    // every connection during session preparation.
+    override public nonisolated var promptPattern: String { #"\w\s%"# }
+
+    /// Maps to netmiko's session_preparation():
+    ///     self._test_channel_read(pattern=self.prompt_pattern)
+    ///     self.base_prompt = self.find_prompt()
+    ///
+    /// Deliberately simpler than the generic Cisco flow — real
+    /// Netmiko doesn't disable paging or run setBasePrompt's
+    /// terminator-validation logic for this platform, just a raw
+    /// prompt capture.
+    override public func sessionPreparation() async throws {
+        try await testChannelRead(pattern: promptPattern)
+        basePrompt = try await findPrompt()
+    }
+
     // Enable mode and config mode on Avara are the same.
     @discardableResult
     override public func enterEnableMode(

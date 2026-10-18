@@ -18,6 +18,10 @@
 public class CiscoAPSSH: CiscoBaseConnection, NoConfig {
     // Protocol provides enterConfigMode, exitConfigMode, sendConfigSet
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     override public func sessionPreparation() async throws {
         try await setTerminalWidth(command: "terminal width 132")
         try await disablePaging()

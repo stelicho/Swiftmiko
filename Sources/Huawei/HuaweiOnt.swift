@@ -24,6 +24,10 @@ import Foundation
 /// prefixed prompt ("SU_WAP>") rather than the base "WAP>".
 open class HuaweiONTBase: CiscoBaseConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     override public nonisolated var promptPattern: String { "WAP>" }
 
     // MARK: Session Preparation

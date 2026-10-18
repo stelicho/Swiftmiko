@@ -58,6 +58,10 @@ public let sophosMenuDefault: String = {
 /// option 4 (Device Console) for a real shell is left to the caller.
 public final class SophosSfosSSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

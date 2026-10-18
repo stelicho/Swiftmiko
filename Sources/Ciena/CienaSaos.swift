@@ -23,6 +23,10 @@ import Foundation
 /// here is more involved than most drivers.
 open class CienaSaosBase: BaseConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     override public nonisolated var promptPattern: String { "[>#$]" }
 
     // MARK: Prompt Detection

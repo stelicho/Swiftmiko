@@ -22,6 +22,10 @@ import Foundation
 /// shared heritage or similar underlying platform vendor.
 public final class CoriantSSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

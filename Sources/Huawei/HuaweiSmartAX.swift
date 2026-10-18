@@ -139,7 +139,7 @@ public class HuaweiSmartAXSSH: CiscoBaseConnection {
         }
 
         let escapedPrompt = NSRegularExpression.escapedPattern(for: basePrompt)
-        _ = try await sendCommand(command, expectString: "\(escapedPrompt)(config)#")
+        _ = try await sendCommand(command, expectString: "\(escapedPrompt)\\(config\\)#")
 
         if privEscalationConfig {
             _ = try await exitConfigMode()

@@ -24,6 +24,10 @@ import Foundation
 /// timing-sensitive expert password prompt.
 public final class CheckPointGaiaSSH: BaseConnection, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     override public nonisolated var promptPattern: String { "[>#]" }
 
     /// Check Point Gaia has repeatedly caused issues with command-echo
@@ -53,14 +57,13 @@ public final class CheckPointGaiaSSH: BaseConnection, NoConfig {
         var adjustedProfile = profile
         // ConnectionProfile.fastCli defaults to true (per the original
         // BaseConnection design) — Gaia needs that inverted default.
-        // If the caller's profile is still sitting at the library
-        // default, force it off; an explicit caller override is
-        // preserved either way since we can't distinguish "explicitly
-        // set to true" from "left at the default true" without a
-        // three-state representation, so this treats bare `true` as
-        // an explicit request the same way Netmiko's kwargs.get(...) or False
-        // treats any truthy passed value as authoritative.
-        adjustedProfile.fastCli = profile.fastCli
+        // Since Swift's ConnectionProfile.fastCli is a plain Bool (no
+        // three-state "explicitly set" representation), this simply
+        // forces fastCli off — matching Netmiko's own kwargs.get(...)
+        // or False, which also can't distinguish "explicitly true" from
+        // "left at the default" and just takes any truthy value as
+        // authoritative while defaulting everything else to off.
+        adjustedProfile.fastCli = false
         super.init(
             profile: adjustedProfile,
             sessionLog: sessionLog,
@@ -188,14 +191,29 @@ public final class CheckPointGaiaSSH: BaseConnection, NoConfig {
 
         defaultUsername: String = ""
     ) async throws -> String {
-        let output = try await super.enterEnableMode(
-            secret: secret,
-            command: command,
+        // BaseConnection.enterEnableMode() has no real implementation
+        // (it unconditionally throws notImplemented) — this class
+        // extends BaseConnection directly rather than CiscoBaseConnection,
+        // so `super` can't be delegated to here. Implements the full
+        // flow itself instead, using enableSecretHandler() above for
+        // the device-specific secret-sending step.
+        if checkState, try await isInEnableMode() { return "" }
+
+        try await writeChannel(normalizeCommand(command))
+        var output = try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
+        output = try await enableSecretHandler(
             pattern: pattern,
-            enablePattern: enablePattern,
-            checkState: checkState,
+            output: output,
             caseInsensitive: caseInsensitive
         )
+
+        if let enablePattern, output.range(
+            of: enablePattern,
+            options: caseInsensitive ? [.regularExpression, .caseInsensitive] : .regularExpression
+        ) == nil {
+            throw SwiftmikoError.unexpectedPrompt("Did not reach enable mode on \(profile.host)")
+        }
+
         try await setBasePrompt()
         return output
     }

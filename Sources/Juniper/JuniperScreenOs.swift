@@ -24,6 +24,10 @@ import Foundation
 /// prompt before allowing login to proceed.
 public final class JuniperScreenOsSSH: BaseConnection, NoEnable, NoConfig {
 
+    override public nonisolated var supportsConfigMode: Bool {
+        false
+    }
+
     // MARK: Session Preparation
 
     /// Handle ScreenOS's optional terms-acceptance prompt, then

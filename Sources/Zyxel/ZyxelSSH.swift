@@ -29,6 +29,25 @@ import Foundation
 ///   - Have no paging to disable.
 public final class ZyxelSSH: CiscoSSHConnection, NoEnable, NoConfig {
 
+    // MARK: Config Mode
+    //
+    // Deliberately does NOT override supportsConfigMode: sendConfigSet()
+    // below is meant to keep working (it's always called with
+    // enterConfigMode: false), and supportsConfigMode gates sendConfigSet()
+    // too, not just enterConfigMode(). What actually needs to be a no-op
+    // is enterConfigMode() itself — CiscoBaseConnection's inherited
+    // implementation sends a real "configure terminal" and waits for a
+    // prompt this device never produces, contradicting the "never
+    // touching a config-mode prompt" contract documented below.
+    @discardableResult
+    override public func enterConfigMode(
+        command: String = "",
+        pattern: String = "",
+        dotAll: Bool = false
+    ) async throws -> String {
+        ""
+    }
+
     // MARK: Paging
 
     /// No paging on Zyxel — nothing to disable.

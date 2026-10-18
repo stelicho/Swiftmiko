@@ -715,7 +715,11 @@ open class AudiocodeShellBase: AudiocodeBase, NoEnable {
         _ commandString: String,
         output: String
     ) -> String {
-        let bannerPattern = #"^SIP.*[\s\S]?PING.*>?.*[\s\S]?.*>?$"#
+        // Maps to netmiko's re.sub(pattern, "", output, flags=re.M) —
+        // (?m) is ICU's inline equivalent of Python's re.M, needed so
+        // ^/$ match line boundaries rather than only the absolute
+        // start/end of the whole output string.
+        let bannerPattern = #"(?m)^SIP.*[\s\S]?PING.*>?.*[\s\S]?.*>?$"#
         var cleaned = output.replacingOccurrences(
             of: bannerPattern,
             with: "",
@@ -738,7 +742,9 @@ open class AudiocodeShellBase: AudiocodeBase, NoEnable {
     ///
     /// Maps to netmiko's strip_prompt() override.
     override public func stripPrompt(_ output: String) -> String {
-        let pattern = "^/>?"
+        // Same re.M-equivalent fix as stripCommand() above — without
+        // (?m), ^ only matches the absolute start of the whole string.
+        let pattern = "(?m)^/>?"
         let cleaned = output.replacingOccurrences(
             of: pattern,
             with: "",
