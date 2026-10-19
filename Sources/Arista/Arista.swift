@@ -172,9 +172,8 @@ open class AristaBase: CiscoSSHConnection {
 
     /// Enter the underlying Bourne shell.
     /// Maps to netmiko's _enter_shell().
-    /// Internal, not private — AristaFileTransfer does not currently
-    /// use this, but it mirrors the module-internal visibility of the
-    /// Python leading-underscore convention seen on other drivers.
+    /// Internal, not private — mirrors the module-internal visibility of
+    /// the Python leading-underscore convention seen on other drivers.
     @discardableResult
     internal func enterShell() async throws -> String {
         return try await sendCommand("bash", expectString: #"[\$#]"#)
@@ -185,6 +184,19 @@ open class AristaBase: CiscoSSHConnection {
     @discardableResult
     internal func returnCLI() async throws -> String {
         return try await sendCommand("exit", expectString: "[#>]")
+    }
+
+    /// Wires AristaFileTransfer's remoteSpaceAvailableUnix()/
+    /// checkFileExistsUnix()/remoteFileSizeUnix() calls to actually
+    /// drop into the Bourne shell first — those generic SCPHandler
+    /// helpers only call the BaseConnection-level hook, which is a
+    /// no-op unless overridden here.
+    override public func enterShellForFileTransfer() async throws {
+        _ = try await enterShell()
+    }
+
+    override public func returnFromShellForFileTransfer() async throws {
+        _ = try await returnCLI()
     }
 }
 

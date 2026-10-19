@@ -882,6 +882,27 @@ open class BaseConnection: DeviceDriver {
         )
     }
 
+    // MARK: Raw-shell hooks for SCPHandler's *Unix helpers
+
+    /// Drop into a raw Unix-style shell before running `/bin/ls`,
+    /// `/bin/df`, etc. Default no-op.
+    ///
+    /// Mirrors Netmiko's `self.ssh_ctl_chan._enter_shell()` call inside
+    /// `_remote_space_available_unix()` / `_check_file_exists_unix()` /
+    /// `_remote_file_size_unix()`. Several drivers (Arista EOS, generic
+    /// Linux, Ciena SAOS, ZPE Nodegrid) already have their own
+    /// `enterShell()`/`returnCLI()` internal methods for exactly this —
+    /// this is the seam SCPHandler (which only holds a plain
+    /// `BaseConnection` reference) can call generically without needing
+    /// a concrete connection subtype. Devices whose CLI runs Unix
+    /// commands directly, or that never use the `*Unix` SCPHandler
+    /// helpers, never need to override this.
+    open func enterShellForFileTransfer() async throws {}
+
+    /// Return from the raw shell entered by `enterShellForFileTransfer()`.
+    /// Default no-op. Mirrors Netmiko's `_return_cli()` call.
+    open func returnFromShellForFileTransfer() async throws {}
+
     // MARK: Generic mode-transition helpers (non-Cisco-specific drivers)
 
     /// Shared generic enable-mode sequence: write `command`, wait for

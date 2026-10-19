@@ -242,19 +242,25 @@ open class SCPHandler {
             stripCommand: false
         )
 
-        guard let match = firstCapture(
-            pattern: searchPattern,
-            in: output
-        ), let value = Int(match) else {
+        guard let expression = try? NSRegularExpression(pattern: searchPattern) else {
+            throw SwiftmikoError.connectionFailed("Invalid search pattern: \(searchPattern)")
+        }
+        let range = NSRange(output.startIndex..<output.endIndex, in: output)
+        guard let match = expression.firstMatch(in: output, range: range),
+              match.numberOfRanges > 1,
+              let captureRange = Range(match.range(at: 1), in: output),
+              let value = Int(output[captureRange]) else {
             throw SwiftmikoError.connectionFailed(
                 "Pattern \(searchPattern) was not detected in output:\n\n\(output)"
             )
         }
 
-        if output.range(
-            of: #"(?i)\d+ kbytes free"#,
-            options: .regularExpression
-        ) != nil {
+        // Check the "kbytes" marker within THIS match's own matched text
+        // (Netmiko's `match.group(0)`), not the whole output — an
+        // unrelated "Kbytes free" elsewhere in a multi-filesystem `dir`
+        // listing must not apply the x1000 multiplier to this number.
+        if let fullMatchRange = Range(match.range, in: output),
+           output[fullMatchRange].range(of: "kbytes", options: .caseInsensitive) != nil {
             return value * 1_000
         }
         return value
@@ -264,6 +270,9 @@ open class SCPHandler {
     open func remoteSpaceAvailableUnix(
         searchPattern: String = #"[#$]"#
     ) async throws -> Int {
+        try await connection.enterShellForFileTransfer()
+        defer { try? await connection.returnFromShellForFileTransfer() }
+
         let output = try await connection.sendCommand(
             "/bin/df -k \(fileSystem)",
             expectString: searchPattern,
@@ -281,10 +290,14 @@ open class SCPHandler {
             )
         }
 
-        let header = lines[0].split(whereSeparator: { $0 == " " || $0 == "\t" })
         let values = lines[1].split(whereSeparator: { $0 == " " || $0 == "\t" })
-        guard header.contains("Filesystem"),
-              header.contains("Avail"),
+        let headerColumns = lines[0].split(whereSeparator: { $0 == " " || $0 == "\t" })
+        // Netmiko checks "Avail" as a SUBSTRING of the 4th header column
+        // specifically (not an exact token) — this also accepts "Available",
+        // the label some *nix `df` variants use instead of "Avail".
+        guard lines[0].contains("Filesystem"),
+              headerColumns.count > 3,
+              headerColumns[3].contains("Avail"),
               values.count > 3,
               let availableBlocks = Int(values[3]) else {
             throw SwiftmikoError.connectionFailed(
@@ -339,14 +352,17 @@ open class SCPHandler {
                 return false
             }
 
+            // Netmiko only accepts the "Directory of ... <file>" match as
+            // proof of existence and throws otherwise — a bare substring
+            // fallback would silently accept outputs real Netmiko treats
+            // as unparseable (masking an actual parsing problem).
             let escapedDestination = NSRegularExpression.escapedPattern(
                 for: destinationFile
             )
-            let found = output.range(
+            guard output.range(
                 of: #"(?s)Directory of .*\#(escapedDestination)"#,
                 options: .regularExpression
-            ) != nil
-            guard found || output.contains(destinationFile) else {
+            ) != nil else {
                 throw SwiftmikoError.connectionFailed(
                     "Unexpected output from checkFileExists:\n\(output)"
                 )
@@ -364,6 +380,9 @@ open class SCPHandler {
     ) async throws -> Bool {
         switch direction {
         case .put:
+            try await connection.enterShellForFileTransfer()
+            defer { try? await connection.returnFromShellForFileTransfer() }
+
             let command = remoteCommand.isEmpty
                 ? "/bin/ls \(fileSystem)/\(destinationFile) 2> /dev/null"
                 : remoteCommand
@@ -437,6 +456,10 @@ open class SCPHandler {
         let command = remoteCommand.isEmpty
             ? "/bin/ls -l \(qualifiedFile)"
             : remoteCommand
+
+        try await connection.enterShellForFileTransfer()
+        defer { try? await connection.returnFromShellForFileTransfer() }
+
         let output = try await connection.sendCommand(
             command,
             expectString: searchPattern,

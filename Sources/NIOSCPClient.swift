@@ -222,12 +222,12 @@ public final class NIOSCPClient: SCPClient, @unchecked Sendable {
             )
             defer { Task { _ = try? await exec.close().get() } }
 
-            try checkACK(try await bridge.readExactly(1), step: "server-ready")
+            try Self.checkACK(try await bridge.readExactly(1), step: "server-ready")
             try await scpWrite(exec, "C0644 \(data.count) \(fileName)\n")
-            try checkACK(try await bridge.readExactly(1), step: "header-accepted")
+            try Self.checkACK(try await bridge.readExactly(1), step: "header-accepted")
             try await scpWriteData(exec, data)
             try await scpWrite(exec, "\0")
-            try checkACK(try await bridge.readExactly(1), step: "transfer-complete")
+            try Self.checkACK(try await bridge.readExactly(1), step: "transfer-complete")
             _ = try? await parent.close().get()
         } catch {
             _ = try? await parent.close().get()
@@ -246,20 +246,11 @@ public final class NIOSCPClient: SCPClient, @unchecked Sendable {
             )
             defer { Task { _ = try? await exec.close().get() } }
 
-            // Signal ready, receive control line "C<mode> <size> <name>\n"
-            try await scpWrite(exec, "\0")
-            let ctrl = try await bridge.readUntilNewline()
-            guard let line = String(data: ctrl, encoding: .utf8), line.hasPrefix("C") else {
-                throw SwiftmikoError.connectionFailed("Unexpected SCP control response")
-            }
-            let parts = line.dropFirst().split(separator: " ", maxSplits: 2)
-            guard parts.count == 3, let fileSize = Int(parts[1]) else {
-                throw SwiftmikoError.connectionFailed("Malformed SCP control line: \(line)")
-            }
-            try await scpWrite(exec, "\0")
-            let fileData = try await bridge.readExactly(fileSize)
-            try await scpWrite(exec, "\0")
-            _ = try? await bridge.readExactly(1)  // final ACK (best effort)
+            let fileData = try await Self.receiveFile(
+                write: { try await self.scpWrite(exec, $0) },
+                readUntilNewline: { try await bridge.readUntilNewline() },
+                readExactly: { try await bridge.readExactly($0) }
+            )
 
             do {
                 try fileData.write(to: URL(fileURLWithPath: destination))
@@ -274,6 +265,41 @@ public final class NIOSCPClient: SCPClient, @unchecked Sendable {
     }
 
     public func close() async {}
+
+    // MARK: SCP "receive a single file" protocol — pure sequencing logic
+
+    /// The sink-side half of the standard scp wire protocol for a
+    /// single file, parameterized over the actual I/O so it's testable
+    /// without a live SSH connection. Returns the raw file bytes.
+    ///
+    /// Sequence: signal ready → read control line "C<mode> <size>
+    /// <name>\n" → ack it → read exactly <size> bytes of file data →
+    /// read AND VALIDATE the source's own trailing status byte (sent
+    /// after the data; non-zero means the source hit an error, e.g. a
+    /// truncated local read, after already announcing the file size)
+    /// → only then send our own ack confirming receipt. This mirrors
+    /// put()'s already-correct header/ack, data+status/ack structure,
+    /// just in the opposite direction.
+    static func receiveFile(
+        write: (String) async throws -> Void,
+        readUntilNewline: () async throws -> Data,
+        readExactly: (Int) async throws -> Data
+    ) async throws -> Data {
+        try await write("\0")
+        let ctrl = try await readUntilNewline()
+        guard let line = String(data: ctrl, encoding: .utf8), line.hasPrefix("C") else {
+            throw SwiftmikoError.connectionFailed("Unexpected SCP control response")
+        }
+        let parts = line.dropFirst().split(separator: " ", maxSplits: 2)
+        guard parts.count == 3, let fileSize = Int(parts[1]) else {
+            throw SwiftmikoError.connectionFailed("Malformed SCP control line: \(line)")
+        }
+        try await write("\0")
+        let fileData = try await readExactly(fileSize)
+        try checkACK(try await readExactly(1), step: "data-sent")
+        try await write("\0")
+        return fileData
+    }
 
     // MARK: Private helpers
 
@@ -364,7 +390,7 @@ public final class NIOSCPClient: SCPClient, @unchecked Sendable {
         ).get()
     }
 
-    private func checkACK(_ data: Data, step: String) throws {
+    private static func checkACK(_ data: Data, step: String) throws {
         guard let b = data.first else {
             throw SwiftmikoError.connectionFailed("SCP: empty ACK at step '\(step)'")
         }

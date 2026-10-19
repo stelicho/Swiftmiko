@@ -85,6 +85,20 @@ open class LinuxSSHConnection: CiscoSSHConnection {
         return ""
     }
 
+    /// Wires LinuxFileTransfer's (and, via inheritance, any subclass's
+    /// — e.g. ZpeNodegridSSH's) remoteSpaceAvailableUnix()/
+    /// checkFileExistsUnix()/remoteFileSizeUnix() calls to actually run
+    /// enterShell()/returnCLI() first. Dynamic dispatch means this
+    /// resolves to whichever override is actually in effect (e.g.
+    /// ZpeNodegridSSH's real shell entry, not this hard no-op).
+    override public func enterShellForFileTransfer() async throws {
+        _ = try await enterShell()
+    }
+
+    override public func returnFromShellForFileTransfer() async throws {
+        _ = try await returnCLI()
+    }
+
     // MARK: Paging
 
     /// Linux has no paging by default — hard no-op.

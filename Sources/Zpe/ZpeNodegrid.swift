@@ -350,7 +350,14 @@ public final class ZpeNodegridFileTransfer: SCPHandler {
             // Best-effort return to CLI — mirrors Python's `finally`.
             // If this fails, the connection is left in shell mode,
             // which the caller's next command will surface clearly.
-            Task { try? await nodegridConnection.returnCLI() }
+            //
+            // A bare `await` directly in a `defer` block (no `Task{}`
+            // wrapper) genuinely suspends the enclosing function until
+            // it completes — wrapping it in `Task{}` instead let
+            // remoteMD5() return to ITS caller before returnCLI() had
+            // actually run, racing whatever command the caller sends
+            // next against this cleanup. (Previously wrapped in Task{}.)
+            try? await nodegridConnection.returnCLI()
         }
 
         let output = try await nodegridConnection.sendCommand(

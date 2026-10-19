@@ -123,10 +123,16 @@ open class CienaSaosBase: BaseConnection, NoEnable, NoConfig {
     /// "SHELL PARSER FAILURE" — and throws a clear, actionable error
     /// explaining that SCP support on this platform requires
     /// "diag shell" permissions the connecting account may not have.
-    /// This matters because CienaSaosFileTransfer's remoteMD5() below
-    /// depends on this method succeeding; a permissions problem here
-    /// would otherwise surface as a confusing downstream failure
-    /// instead of a clear one at the point of actual cause.
+    /// This matters because SCP file transfers on this platform depend
+    /// on this method succeeding (see enterShellForFileTransfer()
+    /// below); a permissions problem here would otherwise surface as a
+    /// confusing downstream failure instead of a clear one at the
+    /// point of actual cause.
+    ///
+    /// Note: no CienaSaosFileTransfer class exists yet in this vendor
+    /// set, so nothing currently calls this through SCPHandler — this
+    /// override exists in advance so SCP support only needs a
+    /// FileTransfer subclass, not a change here, whenever it's added.
     @discardableResult
     internal func enterShell() async throws -> String {
         let output = try await sendCommand(
@@ -146,6 +152,14 @@ open class CienaSaosBase: BaseConnection, NoEnable, NoConfig {
     @discardableResult
     internal func returnCLI() async throws -> String {
         return try await sendCommand("exit", expectString: ">")
+    }
+
+    override public func enterShellForFileTransfer() async throws {
+        _ = try await enterShell()
+    }
+
+    override public func returnFromShellForFileTransfer() async throws {
+        _ = try await returnCLI()
     }
 
     // MARK: Save Config
