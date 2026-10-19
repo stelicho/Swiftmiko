@@ -807,33 +807,92 @@ open class BaseConnection: DeviceDriver {
 
     // MARK: Login (Telnet / Serial)
 
-    /// Confirmed needed by many Telnet drivers. Base implementation
-    /// is a straightforward username/password exchange; drivers with
+    /// Confirmed needed by many Telnet drivers. Base implementation is
+    /// a straightforward username/password exchange; drivers with
     /// vendor-specific banners override it entirely.
+    ///
+    /// Maps to netmiko's telnet_login() — a faithful structural port,
+    /// not just a parameter translation. Two real bugs were found and
+    /// fixed here by comparing against the actual Python source:
+    ///
+    ///  1. The prior version used readUntilPattern() — a BLOCKING
+    ///     wait-for-a-pattern primitive — as its only per-iteration
+    ///     read, and never wrote anything if nothing matched yet. Real
+    ///     Netmiko instead does one non-blocking read_channel() per
+    ///     iteration and writes a bare TELNET_RETURN at the end of any
+    ///     iteration that didn't see a prompt — that nudge is what
+    ///     elicits the next line from a device that prints a banner
+    ///     and then waits silently for a keypress before showing
+    ///     "login:". Without it, such a device just times out instead
+    ///     of ever reaching the write step.
+    ///
+    ///  2. The prior defaults ("#" / ">") were unanchored substring
+    ///     searches, and readUntilPattern ALSO independently checked
+    ///     against promptPattern — so a stray "#"/">" anywhere in
+    ///     banner text (a comment, a copyright line) could cause a
+    ///     false-positive early return before authentication actually
+    ///     completed. Real Netmiko's own defaults anchor to
+    ///     end-of-line specifically to avoid this.
     @discardableResult
     open func telnetLogin(
-        primaryTerminator: String = "#",
-        altTerminator: String = ">",
-        usernamePattern: String = "(?:username|login)",
+        primaryTerminator: String = #"(?m)#\s*$"#,
+        altTerminator: String = #"(?m)>\s*$"#,
+        usernamePattern: String = "(?:user:|username|login|user name)",
         passwordPattern: String = "assword",
         delay: TimeInterval = 1.0,
         maxLoops: Int = 20
     ) async throws -> String {
-        var output = ""
-        for _ in 0..<maxLoops {
-            let combined = "(?:\(usernamePattern)|\(passwordPattern)|\(primaryTerminator)|\(altTerminator))"
-            let chunk = try await readUntilPattern(pattern: combined, caseInsensitive: true)
-            output += chunk
-            if chunk.range(of: usernamePattern, options: [.regularExpression, .caseInsensitive]) != nil {
-                try await writeChannel(profile.username + telnetReturn)
-            } else if chunk.range(of: passwordPattern, options: [.regularExpression, .caseInsensitive]) != nil {
-                if case .password(let password) = profile.auth {
-                    try await writeChannel(password + telnetReturn)
-                }
-            } else {
-                return output
-            }
+        let delayFactor = selectDelayFactor(delay)
+        try await Task.sleep(nanoseconds: UInt64(delayFactor * 1_000_000_000))
+
+        func matchesEitherTerminator(_ text: String) -> Bool {
+            text.range(of: primaryTerminator, options: .regularExpression) != nil ||
+            text.range(of: altTerminator, options: .regularExpression) != nil
         }
+
+        var returnMsg = ""
+        for _ in 0..<maxLoops {
+            var output = try await readChannel()
+            returnMsg += output
+
+            if output.range(of: usernamePattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                // Sometimes username/password must be terminated with
+                // "\r" and not "\r\n".
+                try await writeChannel(profile.username + "\r")
+                try await Task.sleep(nanoseconds: UInt64(delayFactor * 1_000_000_000))
+                output = try await readChannel()
+                returnMsg += output
+            }
+
+            if output.range(of: passwordPattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                if case .password(let password) = profile.auth {
+                    try await writeChannel(password + "\r")
+                }
+                try await Task.sleep(nanoseconds: UInt64(delayFactor * 0.5 * 1_000_000_000))
+                output = try await readChannel()
+                returnMsg += output
+                if matchesEitherTerminator(output) {
+                    return returnMsg
+                }
+            }
+
+            if matchesEitherTerminator(output) {
+                return returnMsg
+            }
+
+            try await writeChannel(telnetReturn)
+            try await Task.sleep(nanoseconds: UInt64(delayFactor * 0.5 * 1_000_000_000))
+        }
+
+        // Last try to see if we're already logged in.
+        try await writeChannel(telnetReturn)
+        try await Task.sleep(nanoseconds: UInt64(delayFactor * 0.5 * 1_000_000_000))
+        let output = try await readChannel()
+        returnMsg += output
+        if matchesEitherTerminator(output) {
+            return returnMsg
+        }
+
         throw SwiftmikoError.authenticationFailed("Login failed: \(profile.host)")
     }
 
