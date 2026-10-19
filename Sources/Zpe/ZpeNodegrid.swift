@@ -346,27 +346,26 @@ public final class ZpeNodegridFileTransfer: SCPHandler {
         let remoteCommand = "\(baseCommand) \(fileSystem)/\(targetFile)"
 
         try await nodegridConnection.enterShell()
-        defer {
-            // Best-effort return to CLI — mirrors Python's `finally`.
-            // If this fails, the connection is left in shell mode,
-            // which the caller's next command will surface clearly.
-            //
-            // A bare `await` directly in a `defer` block (no `Task{}`
-            // wrapper) genuinely suspends the enclosing function until
-            // it completes — wrapping it in `Task{}` instead let
-            // remoteMD5() return to ITS caller before returnCLI() had
-            // actually run, racing whatever command the caller sends
-            // next against this cleanup. (Previously wrapped in Task{}.)
+        // Best-effort return to CLI on either path — mirrors Python's
+        // `finally`. Swift does not support `await` directly in a
+        // `defer` body (confirmed: it compiles locally with some
+        // toolchains but fails in CI — not something to rely on), and
+        // wrapping it in `Task{}` would let remoteMD5() return to ITS
+        // caller before returnCLI() had actually run, racing whatever
+        // command the caller sends next against this cleanup. So the
+        // call is duplicated on both paths instead.
+        do {
+            let output = try await nodegridConnection.sendCommand(
+                remoteCommand,
+                readTimeout: 300,
+                expectString: nodegridConnection.shellPromptPattern
+            )
+            try await nodegridConnection.returnCLI()
+            return try Self.processMD5(output.trimmingCharacters(in: .whitespacesAndNewlines))
+        } catch {
             try? await nodegridConnection.returnCLI()
+            throw error
         }
-
-        let output = try await nodegridConnection.sendCommand(
-            remoteCommand,
-            readTimeout: 300,
-            expectString: nodegridConnection.shellPromptPattern
-        )
-
-        return try Self.processMD5(output.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     /// Extract the MD5 hash from raw md5sum output.

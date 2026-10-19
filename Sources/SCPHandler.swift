@@ -271,40 +271,48 @@ open class SCPHandler {
         searchPattern: String = #"[#$]"#
     ) async throws -> Int {
         try await connection.enterShellForFileTransfer()
-        defer { try? await connection.returnFromShellForFileTransfer() }
-
-        let output = try await connection.sendCommand(
-            "/bin/df -k \(fileSystem)",
-            expectString: searchPattern,
-            stripPrompt: false,
-            stripCommand: false
-        )
-        let lines = output
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-
-        guard lines.count >= 2 else {
-            throw SwiftmikoError.connectionFailed(
-                "Parsing error, unexpected output from /bin/df -k \(fileSystem):\n\(output)"
+        // Swift does not support `await` directly in a `defer` body, so
+        // the return-to-CLI step is duplicated on the success and
+        // failure paths below instead (awaited on success, best-effort
+        // on failure so the original error isn't masked).
+        do {
+            let output = try await connection.sendCommand(
+                "/bin/df -k \(fileSystem)",
+                expectString: searchPattern,
+                stripPrompt: false,
+                stripCommand: false
             )
-        }
+            let lines = output
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
 
-        let values = lines[1].split(whereSeparator: { $0 == " " || $0 == "\t" })
-        let headerColumns = lines[0].split(whereSeparator: { $0 == " " || $0 == "\t" })
-        // Netmiko checks "Avail" as a SUBSTRING of the 4th header column
-        // specifically (not an exact token) — this also accepts "Available",
-        // the label some *nix `df` variants use instead of "Avail".
-        guard lines[0].contains("Filesystem"),
-              headerColumns.count > 3,
-              headerColumns[3].contains("Avail"),
-              values.count > 3,
-              let availableBlocks = Int(values[3]) else {
-            throw SwiftmikoError.connectionFailed(
-                "Parsing error, unexpected output from /bin/df -k \(fileSystem):\n\(output)"
-            )
+            guard lines.count >= 2 else {
+                throw SwiftmikoError.connectionFailed(
+                    "Parsing error, unexpected output from /bin/df -k \(fileSystem):\n\(output)"
+                )
+            }
+
+            let values = lines[1].split(whereSeparator: { $0 == " " || $0 == "\t" })
+            let headerColumns = lines[0].split(whereSeparator: { $0 == " " || $0 == "\t" })
+            // Netmiko checks "Avail" as a SUBSTRING of the 4th header column
+            // specifically (not an exact token) — this also accepts "Available",
+            // the label some *nix `df` variants use instead of "Avail".
+            guard lines[0].contains("Filesystem"),
+                  headerColumns.count > 3,
+                  headerColumns[3].contains("Avail"),
+                  values.count > 3,
+                  let availableBlocks = Int(values[3]) else {
+                throw SwiftmikoError.connectionFailed(
+                    "Parsing error, unexpected output from /bin/df -k \(fileSystem):\n\(output)"
+                )
+            }
+            try await connection.returnFromShellForFileTransfer()
+            return availableBlocks * 1_024
+        } catch {
+            try? await connection.returnFromShellForFileTransfer()
+            throw error
         }
-        return availableBlocks * 1_024
     }
 
     open func localSpaceAvailable() throws -> Int {
@@ -381,18 +389,23 @@ open class SCPHandler {
         switch direction {
         case .put:
             try await connection.enterShellForFileTransfer()
-            defer { try? await connection.returnFromShellForFileTransfer() }
-
-            let command = remoteCommand.isEmpty
-                ? "/bin/ls \(fileSystem)/\(destinationFile) 2> /dev/null"
-                : remoteCommand
-            let output = try await connection.sendCommand(
-                command,
-                expectString: searchPattern,
-                stripPrompt: false,
-                stripCommand: false
-            )
-            return output.contains(destinationFile)
+            // See remoteSpaceAvailableUnix() above — no async defer in Swift.
+            do {
+                let command = remoteCommand.isEmpty
+                    ? "/bin/ls \(fileSystem)/\(destinationFile) 2> /dev/null"
+                    : remoteCommand
+                let output = try await connection.sendCommand(
+                    command,
+                    expectString: searchPattern,
+                    stripPrompt: false,
+                    stripCommand: false
+                )
+                try await connection.returnFromShellForFileTransfer()
+                return output.contains(destinationFile)
+            } catch {
+                try? await connection.returnFromShellForFileTransfer()
+                throw error
+            }
         case .get:
             return FileManager.default.fileExists(atPath: destinationFile)
         }
@@ -458,38 +471,48 @@ open class SCPHandler {
             : remoteCommand
 
         try await connection.enterShellForFileTransfer()
-        defer { try? await connection.returnFromShellForFileTransfer() }
-
-        let output = try await connection.sendCommand(
-            command,
-            expectString: searchPattern,
-            stripPrompt: false,
-            stripCommand: false
-        )
-
-        if output.contains("No such file or directory") {
-            throw SwiftmikoError.connectionFailed(
-                "Unable to find file on remote system: \(qualifiedFile)"
+        // See remoteSpaceAvailableUnix() above — no async defer in Swift.
+        do {
+            let output = try await connection.sendCommand(
+                command,
+                expectString: searchPattern,
+                stripPrompt: false,
+                stripCommand: false
             )
-        }
 
-        let escapedFile = NSRegularExpression.escapedPattern(
-            for: qualifiedFile
-        )
-        for line in output.components(separatedBy: .newlines)
-            where line.range(of: escapedFile, options: .regularExpression) != nil {
-            let fields = line.split(whereSeparator: {
-                $0 == " " || $0 == "\t"
-            })
-            // Unix `ls -l`: mode, links, owner, group, bytes, ...
-            if fields.count > 4, let size = Int(fields[4]) {
-                return size
+            if output.contains("No such file or directory") {
+                throw SwiftmikoError.connectionFailed(
+                    "Unable to find file on remote system: \(qualifiedFile)"
+                )
             }
-        }
 
-        throw SwiftmikoError.connectionFailed(
-            "Pattern not found for remote file size: \(qualifiedFile)"
-        )
+            let escapedFile = NSRegularExpression.escapedPattern(
+                for: qualifiedFile
+            )
+            var foundSize: Int?
+            for line in output.components(separatedBy: .newlines)
+                where line.range(of: escapedFile, options: .regularExpression) != nil {
+                let fields = line.split(whereSeparator: {
+                    $0 == " " || $0 == "\t"
+                })
+                // Unix `ls -l`: mode, links, owner, group, bytes, ...
+                if fields.count > 4, let size = Int(fields[4]) {
+                    foundSize = size
+                    break
+                }
+            }
+
+            guard let foundSize else {
+                throw SwiftmikoError.connectionFailed(
+                    "Pattern not found for remote file size: \(qualifiedFile)"
+                )
+            }
+            try await connection.returnFromShellForFileTransfer()
+            return foundSize
+        } catch {
+            try? await connection.returnFromShellForFileTransfer()
+            throw error
+        }
     }
 
     public static func fileMD5(
