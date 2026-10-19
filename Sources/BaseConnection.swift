@@ -882,6 +882,125 @@ open class BaseConnection: DeviceDriver {
         )
     }
 
+    // MARK: Generic mode-transition helpers (non-Cisco-specific drivers)
+
+    /// Shared generic enable-mode sequence: write `command`, wait for
+    /// `pattern` (a password prompt), send `secret` if that pattern
+    /// appeared, then wait for `enablePattern` (or promptPattern).
+    ///
+    /// Mirrors CiscoBaseConnection.enterEnableMode() exactly. Exists
+    /// here, not just there, because several drivers extend
+    /// BaseConnection directly (not CiscoBaseConnection) yet have a
+    /// device enable-mode that fits this same one-command,
+    /// optional-password shape (Fujitsu Si-R, Yamaha, Nokia SR OS,
+    /// AudioCode, Ericsson IPOS, NEC IX). Those drivers call this
+    /// directly instead of `super.enterEnableMode(...)`, which would
+    /// otherwise silently resolve to the throwing stub above.
+    @discardableResult
+    public func genericEnterEnableMode(
+        secret: String,
+        command: String,
+        pattern: String,
+        enablePattern: String?,
+        checkState: Bool,
+        caseInsensitive: Bool
+    ) async throws -> String {
+        if checkState, try await isInEnableMode() { return "" }
+
+        try await writeChannel(command + profile.returnCharacter)
+        var output = try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
+
+        let sawPasswordPrompt = output.range(
+            of: pattern, options: caseInsensitive ? [.regularExpression, .caseInsensitive] : .regularExpression
+        ) != nil
+
+        if sawPasswordPrompt {
+            guard let secretToSend = secret.isEmpty ? profile.secret : secret, !secretToSend.isEmpty else {
+                throw SwiftmikoError.authenticationFailed(
+                    "Enable password required for \(profile.host), but no secret was provided"
+                )
+            }
+            try await writeChannel(secretToSend + profile.returnCharacter)
+            output += try await readUntilPromptOrPattern(
+                pattern: enablePattern ?? promptPattern, timeout: profile.readTimeout
+            )
+        }
+
+        if let enablePattern, output.range(of: enablePattern, options: .regularExpression) == nil {
+            throw SwiftmikoError.unexpectedPrompt("Did not reach enable mode on \(profile.host)")
+        }
+        return output
+    }
+
+    /// Shared generic "send the exit command and wait for the next
+    /// prompt" sequence. Mirrors CiscoBaseConnection.exitEnableMode()
+    /// exactly — see genericEnterEnableMode() above for why this needs
+    /// to exist independently of that class.
+    @discardableResult
+    public func genericExitEnableMode(exitCommand: String) async throws -> String {
+        try await sendCommand(exitCommand, stripPrompt: false, stripCommand: false)
+    }
+
+    /// Shared generic "send the command, enter config mode
+    /// optimistically, wait for the resulting prompt" sequence.
+    /// Mirrors CiscoBaseConnection.enterConfigMode() exactly — see
+    /// genericEnterEnableMode() above for why this needs to exist
+    /// independently of that class.
+    @discardableResult
+    public func genericEnterConfigMode(
+        command: String,
+        pattern: String,
+        dotAll: Bool = false
+    ) async throws -> String {
+        try await writeChannel(command + profile.returnCharacter)
+        inConfigMode = true
+        if pattern.isEmpty {
+            return try await readUntilPrompt(timeout: profile.readTimeout)
+        }
+        return try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
+    }
+
+    /// Shared generic "send the exit command, wait for the resulting
+    /// prompt" config-mode sequence. Mirrors
+    /// CiscoBaseConnection.exitConfigMode() exactly — see
+    /// genericEnterEnableMode() above for why this needs to exist
+    /// independently of that class.
+    @discardableResult
+    public func genericExitConfigMode(
+        exitConfig: String,
+        pattern: String
+    ) async throws -> String {
+        guard try await isInConfigMode() else { return "" }
+        try await writeChannel(exitConfig + profile.returnCharacter)
+        let output = pattern.isEmpty
+            ? try await readUntilPrompt(timeout: profile.readTimeout)
+            : try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
+        inConfigMode = false
+        return output
+    }
+
+    /// Shared generic "does the current prompt contain checkString"
+    /// config-mode check. Mirrors CiscoBaseConnection.isInConfigMode()
+    /// exactly — see genericEnterEnableMode() above for why this needs
+    /// to exist independently of that class.
+    public func genericIsInConfigMode(
+        checkString: String,
+        pattern: String = ""
+    ) async throws -> Bool {
+        let prompt = try await findPrompt()
+        return !checkString.isEmpty && prompt.contains(checkString)
+    }
+
+    /// Shared generic "send the command, wait for its echo or prompt"
+    /// paging-disable sequence. Mirrors
+    /// CiscoBaseConnection.disablePaging() exactly — see
+    /// genericEnterEnableMode() above for why this needs to exist
+    /// independently of that class.
+    @discardableResult
+    public func genericDisablePaging(command: String) async throws -> String {
+        try await sendCommand(command, stripPrompt: false, stripCommand: false)
+    }
+
     // MARK: Delay scaling
 
     /// Confirmed needed by CDOT CROS, Check Point Gaia, and every

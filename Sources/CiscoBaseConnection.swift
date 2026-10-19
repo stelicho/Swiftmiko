@@ -126,7 +126,7 @@ open class CiscoBaseConnection: BaseConnection {
 
     @discardableResult
     override open func serialLogin(
-        primaryTerminator: String = #"\#\s*$"#,
+        primaryTerminator: String = #"#\s*$"#,
         altTerminator: String = #">\s*$"#,
         usernamePattern: String = #"(?:user:|username|login)"#,
         passwordPattern: String = #"assword"#,

@@ -42,6 +42,21 @@ open class YamahaBase: BaseConnection {
         try await clearBuffer()
     }
 
+    // MARK: Paging
+
+    /// YamahaBase extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "console lines infinity",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Enable Mode
 
     /// Maps to netmiko's check_enable_mode(check_string="#").
@@ -71,7 +86,7 @@ open class YamahaBase: BaseConnection {
 
         defaultUsername: String = ""
     ) async throws -> String {
-        return try await super.enterEnableMode(
+        return try await genericEnterEnableMode(
             secret: secret,
             command: command,
             pattern: pattern,
@@ -131,7 +146,7 @@ open class YamahaBase: BaseConnection {
         checkString: String = "#",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )

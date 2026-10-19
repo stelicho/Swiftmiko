@@ -54,7 +54,7 @@ public final class EricssonIposSSH: BaseConnection {
 
         defaultUsername: String = ""
     ) async throws -> String {
-        return try await super.enterEnableMode(
+        return try await genericEnterEnableMode(
             secret: secret,
             command: command,
             pattern: pattern,
@@ -69,7 +69,22 @@ public final class EricssonIposSSH: BaseConnection {
     override public func exitEnableMode(
         exitCommand: String = "disable"
     ) async throws -> String {
-        return try await super.exitEnableMode(exitCommand: exitCommand)
+        return try await genericExitEnableMode(exitCommand: exitCommand)
+    }
+
+    // MARK: Paging
+
+    /// EricssonIposSSH extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "terminal length 0",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
     }
 
     // MARK: Config Mode
@@ -79,7 +94,7 @@ public final class EricssonIposSSH: BaseConnection {
         checkString: String = ")#",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -93,7 +108,7 @@ public final class EricssonIposSSH: BaseConnection {
 
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern
         )
@@ -113,7 +128,7 @@ public final class EricssonIposSSH: BaseConnection {
         exitConfig: String = "end",
         pattern: String = "#"
     ) async throws -> String {
-        return try await super.exitConfigMode(
+        return try await genericExitConfigMode(
             exitConfig: exitConfig,
             pattern: pattern
         )

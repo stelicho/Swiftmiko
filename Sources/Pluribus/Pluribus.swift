@@ -89,10 +89,6 @@ public final class PluribusSSH: BaseConnection, NoConfig {
         cmdVerify: Bool = true,
         pattern: String? = nil
     ) async throws -> String {
-        return try await super.disablePaging(
-            command: command,
-            cmdVerify: cmdVerify,
-            pattern: pattern
-        )
+        return try await genericDisablePaging(command: command)
     }
 }

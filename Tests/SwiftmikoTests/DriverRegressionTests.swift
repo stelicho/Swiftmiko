@@ -213,4 +213,106 @@ final class DriverRegressionTests: XCTestCase {
 
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("terminal length 0") })
     }
+
+    // MARK: - "super.foo() on a BaseConnection-direct class" footgun sweep
+    //
+    // Several drivers extend BaseConnection directly (not
+    // CiscoBaseConnection) and either called super.enterEnableMode()/
+    // exitEnableMode()/disablePaging() — all three unconditionally throw
+    // on BaseConnection — or called enterConfigMode()/exitConfigMode()/
+    // isInConfigMode()/disablePaging() with NO override in the file at
+    // all, silently inheriting the same throwing stubs (or, for config
+    // mode, a flag-only no-op that never does real wire I/O). Fixed by
+    // adding shared `generic*` helpers to BaseConnection — mirroring
+    // CiscoBaseConnection's existing proven implementations — that
+    // these drivers now call directly instead of `super.xxx(...)`.
+
+    func testPluribusDisablePagingSendsPagerOffInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["pluribus-switch#"])
+        try await channel.open()
+        let connection = PluribusSSH(
+            profile: testProfile(deviceType: "pluribus"),
+            channel: channel
+        )
+
+        // Before the fix, this always threw notImplemented — Pluribus's
+        // own disablePaging() override unconditionally called
+        // super.disablePaging(), which resolved to BaseConnection's
+        // throwing stub since PluribusSSH extends BaseConnection
+        // directly, not CiscoBaseConnection.
+        _ = try await connection.disablePaging()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("pager off") })
+    }
+
+    func testYamahaEnterEnableModeSendsAdministratorCommandAndPassword() async throws {
+        let channel = ScriptedChannel(responses: [
+            "YAMAHA>",     // isInEnableMode() precheck -> not yet enabled
+            "Password: ",  // wait for the password prompt after "administrator"
+            "YAMAHA#",     // wait for the prompt after the secret is sent
+        ])
+        try await channel.open()
+        let connection = YamahaSSH(
+            profile: testProfile(deviceType: "yamaha", secret: "adminpass"),
+            channel: channel
+        )
+
+        // Before the fix, this always threw notImplemented — Yamaha's
+        // enterEnableMode() called super.enterEnableMode(), which
+        // resolved to BaseConnection's throwing stub.
+        _ = try await connection.enterEnableMode(secret: "adminpass")
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("administrator") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("adminpass") })
+    }
+
+    func testEricssonIposEnterAndExitConfigModeSendRealCommandsNotSilentNoOps() async throws {
+        let channel = ScriptedChannel(responses: [
+            "router(config)#",  // enterConfigMode: wait for the prompt after "configure"
+            "router(config)#",  // exitConfigMode's isInConfigMode() precheck
+            "router#",          // exitConfigMode: wait for "#" after "end"
+        ])
+        try await channel.open()
+        let connection = EricssonIposSSH(
+            profile: testProfile(deviceType: "ericsson_ipos"),
+            channel: channel
+        )
+
+        // Before the fix, both of these silently no-opped (BaseConnection's
+        // enterConfigMode()/exitConfigMode() just flip the inConfigMode
+        // flag and return "" — no throw, but also no real command ever
+        // sent to the device) since EricssonIposSSH extends BaseConnection
+        // directly and called super.enterConfigMode()/exitConfigMode().
+        _ = try await connection.enterConfigMode()
+        _ = try await connection.exitConfigMode()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("configure") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("end") })
+    }
+
+    // MARK: - CiscoBaseConnection: serialLogin()'s own raw-string bug dropped "#" from primaryTerminator
+
+    func testCiscoBaseConnectionSerialLoginDoesNotMistakeABannerLineForAnAlreadyCompleteLogin() async throws {
+        let channel = ScriptedChannel(responses: [
+            "Welcome to IOS, a generic banner line\n",
+            "login as: ",
+            "assword: ",
+            "host#",
+        ])
+        try await channel.open()
+        let connection = CiscoSSHConnection(
+            profile: testProfile(deviceType: "cisco_ios", password: "hunter2"),
+            channel: channel
+        )
+
+        _ = try await connection.serialLogin()
+
+        // Before the fix, primaryTerminator's default compiled to just
+        // "\s*$" (trivially matches the end of any string, including
+        // the banner line), so serialLogin() would mistake the banner
+        // for an already-complete login and never fall through to
+        // telnetLogin() at all — neither of these would ever be sent.
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("netadmin") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("hunter2") })
+    }
 }

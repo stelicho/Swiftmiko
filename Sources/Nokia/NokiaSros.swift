@@ -106,6 +106,23 @@ open class NokiaSros: BaseConnection {
         }
     }
 
+    // MARK: Paging
+
+    /// NokiaSros extends BaseConnection directly, whose disablePaging()
+    /// unconditionally throws — this gives it the same real generic
+    /// behavior CiscoBaseConnection-rooted drivers get. sessionPreparation()
+    /// always passes its own explicit command, so this override's own
+    /// default is never actually relied upon.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "environment more false",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Complete-on-Space (Model-Driven CLI Only)
 
     /// Disable command auto-completion on space — same rationale as
@@ -139,7 +156,7 @@ open class NokiaSros: BaseConnection {
         defaultUsername: String = ""
     ) async throws -> String {
         let resolvedCommand = basePrompt.contains("@") ? command : "enable-admin"
-        return try await super.enterEnableMode(
+        return try await genericEnterEnableMode(
             secret: secret,
             command: resolvedCommand,
             pattern: pattern,
@@ -231,7 +248,7 @@ open class NokiaSros: BaseConnection {
 
         // Only model-driven CLI supports config mode at all.
         if basePrompt.contains("@") {
-            output += try await super.enterConfigMode(
+            output += try await genericEnterConfigMode(
                 command: command,
                 pattern: resolvedPattern,
                 dotAll: resolvedDotAll
@@ -255,7 +272,7 @@ open class NokiaSros: BaseConnection {
         guard basePrompt.contains("@") else {
             return false
         }
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )

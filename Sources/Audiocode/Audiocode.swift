@@ -202,14 +202,13 @@ open class AudiocodeBase: BaseConnection {
         caseInsensitive: Bool = true,
         defaultUsername: String = ""
     ) async throws -> String {
-        return try await super.enterEnableMode(
+        return try await genericEnterEnableMode(
             secret: secret,
             command: command,
             pattern: pattern,
             enablePattern: enablePattern,
             checkState: checkState,
-            caseInsensitive: caseInsensitive,
-            defaultUsername: defaultUsername
+            caseInsensitive: caseInsensitive
         )
     }
 
@@ -218,7 +217,7 @@ open class AudiocodeBase: BaseConnection {
     override public func exitEnableMode(
         exitCommand: String = "disable"
     ) async throws -> String {
-        return try await super.exitEnableMode(exitCommand: exitCommand)
+        return try await genericExitEnableMode(exitCommand: exitCommand)
     }
 
     /// Exit configuration mode, looping until fully out.
@@ -387,10 +386,7 @@ open class Audiocode72Base: AudiocodeBase {
         pattern: String? = nil
     ) async throws -> String {
         guard command.isEmpty else {
-            return try await super.disablePaging(
-                command: command,
-                pattern: pattern
-            )
+            return try await genericDisablePaging(command: command)
         }
 
         let commands = ["cli-settings", "window-height 0"]
@@ -453,10 +449,7 @@ open class AudiocodeBase66: AudiocodeBase {
         pattern: String? = nil
     ) async throws -> String {
         guard command.isEmpty else {
-            return try await super.disablePaging(
-                command: command,
-                pattern: pattern
-            )
+            return try await genericDisablePaging(command: command)
         }
 
         let commands = ["cli-terminal", "set window-height 0"]
