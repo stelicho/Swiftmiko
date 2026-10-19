@@ -78,11 +78,20 @@ public struct SNMPAutodetectRule: Sendable {
     public let oid: String
     public let pattern: String
     public let priority: Int
+    /// Matches netmiko's own per-rule `re.IGNORECASE` flag — NOT every
+    /// rule uses it. `checkpoint`, `juniper_junos`, `nokia_sros`, and
+    /// `hirschmann_hios` are compiled case-SENSITIVE in real Netmiko;
+    /// applying case-insensitive matching to them uniformly (as an
+    /// earlier version of this file did) could false-positive match a
+    /// response containing their pattern in the wrong case that real
+    /// Netmiko would correctly reject.
+    public let caseInsensitive: Bool
 
-    public init(oid: String, pattern: String, priority: Int) {
+    public init(oid: String, pattern: String, priority: Int, caseInsensitive: Bool = true) {
         self.oid = oid
         self.pattern = pattern
         self.priority = priority
+        self.caseInsensitive = caseInsensitive
     }
 }
 
@@ -101,12 +110,20 @@ public enum SNMPAutodetectMapper {
         "cisco_wlc": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*Cisco Controller.*", priority: 99),
         "f5_tmsh": .init(oid: ".1.3.6.1.4.1.3375.2.1.4.1.0", pattern: ".*BIG-IP.*", priority: 99),
         "fortinet": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: "Forti.*", priority: 80),
-        "checkpoint": .init(oid: ".1.3.6.1.4.1.2620.1.6.16.9.0", pattern: "CheckPoint", priority: 79),
-        "juniper_junos": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*Juniper.*", priority: 99),
-        "nokia_sros": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*TiMOS.*", priority: 99),
+        "checkpoint": .init(
+            oid: ".1.3.6.1.4.1.2620.1.6.16.9.0", pattern: "CheckPoint", priority: 79, caseInsensitive: false
+        ),
+        "juniper_junos": .init(
+            oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*Juniper.*", priority: 99, caseInsensitive: false
+        ),
+        "nokia_sros": .init(
+            oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*TiMOS.*", priority: 99, caseInsensitive: false
+        ),
         "dell_powerconnect": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: "PowerConnect.*", priority: 50),
         "mikrotik_routeros": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*RouterOS.*", priority: 60),
-        "hirschmann_hios": .init(oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*Hirschmann BOBCAT.*", priority: 60)
+        "hirschmann_hios": .init(
+            oid: ".1.3.6.1.2.1.1.1.0", pattern: ".*Hirschmann BOBCAT.*", priority: 60, caseInsensitive: false
+        )
     ]
 }
 
@@ -213,10 +230,10 @@ public class SNMPDetect {
         for (deviceType, rule) in ordered {
             let response = try await response(for: rule.oid)
             guard !response.isEmpty else { continue }
-            if response.range(
-                of: rule.pattern,
-                options: [.regularExpression, .caseInsensitive]
-            ) != nil {
+            let options: String.CompareOptions = rule.caseInsensitive
+                ? [.regularExpression, .caseInsensitive]
+                : [.regularExpression]
+            if response.range(of: rule.pattern, options: options) != nil {
                 return deviceType
             }
         }

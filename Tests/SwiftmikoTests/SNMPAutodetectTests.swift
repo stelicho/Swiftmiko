@@ -155,6 +155,57 @@ final class SNMPAutodetectTests: XCTestCase {
         XCTAssertEqual(result, "mikrotik_routeros")
     }
 
+    // MARK: - Case-sensitivity (regression: was uniformly case-insensitive)
+    //
+    // Real Netmiko compiles 4 of its 18 rules WITHOUT re.IGNORECASE:
+    // checkpoint, juniper_junos, nokia_sros, hirschmann_hios. An earlier
+    // version of SNMPAutodetectMapper applied case-insensitive matching
+    // to every rule uniformly, which could false-positive match a
+    // response containing one of these 4 patterns in the wrong case
+    // that real Netmiko would correctly reject.
+
+    func testCheckpointPatternIsCaseSensitiveMatchingRealNetmiko() async throws {
+        let transport = MockSNMPTransport()
+        transport.responses[".1.3.6.1.2.1.1.1.0"] = "Nothing matches this banner text"
+        // Wrong case — real Netmiko's case-sensitive "CheckPoint" pattern
+        // must NOT match this.
+        transport.responses[".1.3.6.1.4.1.2620.1.6.16.9.0"] = "checkpoint"
+
+        let detector = try SNMPDetect(
+            hostname: "203.0.113.1", snmpVersion: .v2c, community: "public", transport: transport
+        )
+        let result = try await detector.autodetect()
+
+        XCTAssertNil(result, "lowercase 'checkpoint' must not match the case-sensitive CheckPoint rule")
+    }
+
+    func testCheckpointPatternStillMatchesTheRealCasing() async throws {
+        let transport = MockSNMPTransport()
+        transport.responses[".1.3.6.1.2.1.1.1.0"] = "Nothing matches this banner text"
+        transport.responses[".1.3.6.1.4.1.2620.1.6.16.9.0"] = "CheckPoint"
+
+        let detector = try SNMPDetect(
+            hostname: "203.0.113.1", snmpVersion: .v2c, community: "public", transport: transport
+        )
+        let result = try await detector.autodetect()
+
+        XCTAssertEqual(result, "checkpoint")
+    }
+
+    func testNokiaSrosPatternIsCaseSensitiveMatchingRealNetmiko() async throws {
+        let transport = MockSNMPTransport()
+        // Wrong case — real Netmiko's case-sensitive "TiMOS" pattern
+        // must NOT match "timos".
+        transport.responses[".1.3.6.1.2.1.1.1.0"] = "Some device running timos 21.2"
+
+        let detector = try SNMPDetect(
+            hostname: "203.0.113.1", snmpVersion: .v2c, community: "public", transport: transport
+        )
+        let result = try await detector.autodetect()
+
+        XCTAssertNil(result, "lowercase 'timos' must not match the case-sensitive TiMOS rule")
+    }
+
     // MARK: - SNMPAutodetectMapper
 
     func testEveryRuleHasAValidRegexPattern() {
