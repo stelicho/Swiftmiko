@@ -199,6 +199,22 @@ open class NokiaSros: BaseConnection {
     ///
     /// Maps to netmiko's config_mode(config_command="edit-config
     /// exclusive").
+    /// Pure resolution logic for enterConfigMode() below, split out so
+    /// it's directly testable without a channel: a non-empty caller
+    /// `pattern` must keep the caller's own `dotAll` value (a bug fix —
+    /// this used to always reset to false here, shadowing the
+    /// parameter with a same-named local var), while an empty pattern
+    /// falls back to Nokia's own exclusive-edit-prompt regex, which
+    /// genuinely does need dotAll forced on to match across lines.
+    static func resolvePatternAndDotAll(
+        pattern: String,
+        dotAll: Bool,
+        basePrompt: String
+    ) -> (pattern: String, dotAll: Bool) {
+        guard pattern.isEmpty else { return (pattern, dotAll) }
+        return (#"\(ex\)\[.*"# + basePrompt + #".*$"#, true)
+    }
+
     @discardableResult
     override public func enterConfigMode(
         command: String = "edit-config exclusive",
@@ -207,13 +223,11 @@ open class NokiaSros: BaseConnection {
         dotAll: Bool = false
     ) async throws -> String {
         var output = ""
-        var resolvedPattern = pattern
-        var resolvedDotAll = dotAll
-
-        if resolvedPattern.isEmpty {
-            resolvedPattern = #"\(ex\)\[.*"# + basePrompt + #".*$"#
-            resolvedDotAll = true
-        }
+        let (resolvedPattern, resolvedDotAll) = Self.resolvePatternAndDotAll(
+            pattern: pattern,
+            dotAll: dotAll,
+            basePrompt: basePrompt
+        )
 
         // Only model-driven CLI supports config mode at all.
         if basePrompt.contains("@") {
