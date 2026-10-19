@@ -153,6 +153,54 @@ final class SerialChannelTests: XCTestCase {
         XCTAssertTrue(connection.channel is SerialChannel)
     }
 
+    // MARK: - decodeAvailableText(): split multi-byte UTF-8 across reads
+    //
+    // Regression coverage for a bug found in a fresh adversarial pass:
+    // a multi-byte UTF-8 character split across two separate read()
+    // calls used to fall back to Latin-1 decoding for the chunk
+    // containing the partial sequence, misreading it as separate
+    // single-byte characters instead of correctly buffering the
+    // dangling bytes until the rest of the sequence arrives.
+
+    func testDecodeAvailableTextBuffersADanglingPartialMultiByteCharacter() {
+        // "café" — the trailing "é" is 2 UTF-8 bytes (0xC3 0xA9); only
+        // the first byte arrived so far.
+        var buffer = Data("caf".utf8)
+        buffer.append(0xC3)
+
+        let (text, remaining) = SerialChannel.decodeAvailableText(from: buffer)
+
+        XCTAssertEqual(text, "caf", "the lone partial byte must not corrupt the already-complete prefix")
+        XCTAssertEqual(remaining, Data([0xC3]), "the dangling byte must be buffered, not decoded as Latin-1 garbage")
+    }
+
+    func testDecodeAvailableTextCompletesTheCharacterOnceTheRestArrives() {
+        // The continuation byte for "é" (0xA9) arrives in the next chunk.
+        let buffer = Data([0xC3, 0xA9])
+
+        let (text, remaining) = SerialChannel.decodeAvailableText(from: buffer)
+
+        XCTAssertEqual(text, "é")
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    func testDecodeAvailableTextFallsBackToLatin1ForGenuinelyNonUTF8Data() {
+        // 0xFF is never a valid UTF-8 byte in any position — this isn't
+        // a split character, it's just not UTF-8 at all.
+        let buffer = Data([0xFF, 0xFE])
+
+        let (text, remaining) = SerialChannel.decodeAvailableText(from: buffer)
+
+        XCTAssertEqual(text, String(bytes: buffer, encoding: .isoLatin1))
+        XCTAssertTrue(remaining.isEmpty, "the whole buffer should be consumed by the Latin-1 fallback")
+    }
+
+    func testDecodeAvailableTextReturnsEmptyForAnEmptyBuffer() {
+        let (text, remaining) = SerialChannel.decodeAvailableText(from: Data())
+        XCTAssertEqual(text, "")
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     // MARK: - Driver logic over a fake channel (transport-agnostic)
 
     func testCiscoIOSSerialSendCommandStripsEchoAndPromptJustLikeSSH() async throws {

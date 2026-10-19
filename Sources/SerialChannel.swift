@@ -73,15 +73,25 @@ public struct SerialSettings: Sendable, Equatable {
 /// internal buffer. `readAvailable()` drains that buffer without blocking,
 /// matching the non-blocking contract shared by NIOSSHChannel and
 /// NIOTelnetChannel.
+///
+/// `fd` and `isOpen` are read from both the calling thread (open/close/
+/// write) and the background read-loop thread, so both are guarded by
+/// `lock` alongside `inputBuffer` — a bare unsynchronized `Int32`/`Bool`
+/// here would let `close()` race the read loop's `Darwin.read(fd, ...)`
+/// call, risking a read against an already-closed (and potentially
+/// reused) file descriptor.
 public final class SerialChannel: Swiftmiko.Channel, @unchecked Sendable {
     private let portPath: String
     private let settings: SerialSettings
-    private var fd: Int32 = -1
 
     private let lock = NSLock()
+    private var _fd: Int32 = -1
+    private var _isOpen = false
     private var inputBuffer = Data()
 
-    public private(set) var isOpen = false
+    public var isOpen: Bool {
+        lock.withLock { _isOpen }
+    }
 
     public init(profile: ConnectionProfile) {
         self.portPath = profile.host
@@ -156,8 +166,10 @@ public final class SerialChannel: Swiftmiko.Channel, @unchecked Sendable {
             )
         }
 
-        fd = rawFD
-        isOpen = true
+        lock.withLock {
+            _fd = rawFD
+            _isOpen = true
+        }
         startReadLoop()
 #else
         throw SwiftmikoError.notImplemented(
@@ -179,22 +191,61 @@ public final class SerialChannel: Swiftmiko.Channel, @unchecked Sendable {
     /// is empty; the caller's readUntilPattern() loop handles retries.
     public func readAvailable() async throws -> String {
         guard isOpen else { throw SwiftmikoError.channelClosed }
-        let data = lock.withLock {
-            let d = inputBuffer; inputBuffer = Data(); return d
+        return lock.withLock {
+            let (text, remaining) = Self.decodeAvailableText(from: inputBuffer)
+            inputBuffer = remaining
+            return text
         }
-        if data.isEmpty { return "" }
-        return String(bytes: data, encoding: .utf8)
-            ?? String(bytes: data, encoding: .isoLatin1)
-            ?? ""
+    }
+
+    /// Decode the longest prefix of `buffer` that is valid, complete
+    /// UTF-8, returning the decoded text plus whatever undecoded tail
+    /// should stay buffered for a future call to complete.
+    ///
+    /// A multi-byte UTF-8 character can be split across two separate
+    /// read() calls. Trimming up to 3 trailing bytes (the longest a
+    /// dangling partial sequence can be) off the end before decoding
+    /// lets the complete prefix decode correctly, leaving the partial
+    /// tail for next time — rather than falling back to Latin-1 and
+    /// misreading a split multi-byte character as separate single-byte
+    /// ones. Only falls back to Latin-1 (for the WHOLE buffer) when
+    /// trimming still doesn't produce valid UTF-8 — i.e. the data
+    /// genuinely isn't UTF-8, not just split mid-character.
+    ///
+    /// Pulled out as a pure, static function (no channel/threading
+    /// involved) specifically so this decoding edge case is testable
+    /// without a real serial port.
+    static func decodeAvailableText(from buffer: Data) -> (text: String, remaining: Data) {
+        guard !buffer.isEmpty else { return ("", buffer) }
+
+        let maxTrim = min(3, buffer.count - 1)
+        var trim = 0
+        while trim <= maxTrim {
+            let decodableLength = buffer.count - trim
+            if let string = String(bytes: buffer.prefix(decodableLength), encoding: .utf8) {
+                return (string, buffer.dropFirst(decodableLength))
+            }
+            trim += 1
+        }
+
+        let fallback = String(bytes: buffer, encoding: .isoLatin1) ?? ""
+        return (fallback, Data())
     }
 
     public func close() async {
-        isOpen = false
 #if canImport(Darwin)
-        if fd >= 0 {
-            Darwin.close(fd)
-            fd = -1
+        let fdToClose: Int32? = lock.withLock {
+            guard _isOpen else { return nil }
+            _isOpen = false
+            let f = _fd
+            _fd = -1
+            return f
         }
+        if let fdToClose, fdToClose >= 0 {
+            Darwin.close(fdToClose)
+        }
+#else
+        lock.withLock { _isOpen = false }
 #endif
     }
 
@@ -202,11 +253,14 @@ public final class SerialChannel: Swiftmiko.Channel, @unchecked Sendable {
 
     private func writeRaw(_ bytes: [UInt8]) throws {
 #if canImport(Darwin)
+        let targetFD = lock.withLock { _fd }
+        guard targetFD >= 0 else { throw SwiftmikoError.channelClosed }
+
         let data = Data(bytes)
         var total = 0
         while total < data.count {
             let n = data.withUnsafeBytes { ptr -> Int in
-                Darwin.write(fd, ptr.baseAddress!.advanced(by: total), ptr.count - total)
+                Darwin.write(targetFD, ptr.baseAddress!.advanced(by: total), ptr.count - total)
             }
             if n < 0 {
                 if errno == EINTR { continue }
@@ -229,12 +283,22 @@ public final class SerialChannel: Swiftmiko.Channel, @unchecked Sendable {
     private func readLoop() {
 #if canImport(Darwin)
         var buf = [UInt8](repeating: 0, count: 4096)
-        while isOpen && fd >= 0 {
-            let n = Darwin.read(fd, &buf, buf.count)
+        while true {
+            let (open, currentFD): (Bool, Int32) = lock.withLock { (_isOpen, _fd) }
+            guard open, currentFD >= 0 else { break }
+
+            let n = Darwin.read(currentFD, &buf, buf.count)
             if n > 0 {
                 lock.withLock { inputBuffer.append(contentsOf: buf.prefix(n)) }
             } else if n == 0 {
-                break  // EOF / device removed
+                // VMIN=0, VTIME=1 means this read was opened in POSIX
+                // termios "Case C" (MIN==0, TIME>0): per the termios(4)
+                // spec, a 0-byte return here means the 100ms read timer
+                // expired with no data available — NOT end-of-file.
+                // Treating it as a disconnect would kill this loop after
+                // the device's very first idle moment, which is
+                // virtually guaranteed in any real interactive session.
+                continue
             } else {
                 if errno == EAGAIN || errno == EINTR {
                     Thread.sleep(forTimeInterval: 0.01)
