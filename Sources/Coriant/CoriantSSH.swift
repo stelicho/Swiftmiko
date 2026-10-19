@@ -22,8 +22,45 @@ import Foundation
 /// shared heritage or similar underlying platform vendor.
 public final class CoriantSSH: CiscoSSHConnection, NoEnable, NoConfig {
 
-    override public nonisolated var supportsConfigMode: Bool {
-        false
+    // NoConfig: real Netmiko's mixin is a trivial pass-through
+    // (check_config_mode->True, config_mode/exit_config_mode->""),
+    // not a throw — see Sources/NoConfig.swift for why this needs a
+    // direct override rather than a protocol extension default.
+    override public func isInConfigMode(checkString: String = "", pattern: String = "") async throws -> Bool {
+        NoConfigBehavior.isInConfigMode()
+    }
+
+    @discardableResult
+    override public func enterConfigMode(command: String = "", pattern: String = "", dotAll: Bool = false) async throws -> String {
+        NoConfigBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitConfigMode(exitConfig: String = "exit", pattern: String = "") async throws -> String {
+        NoConfigBehavior.exit()
+    }
+
+    // NoEnable: same trivial-pass-through story — see Sources/NoEnable.swift.
+    override public func isInEnableMode(checkString: String = "") async throws -> Bool {
+        NoEnableBehavior.isInEnableMode()
+    }
+
+    @discardableResult
+    override public func enterEnableMode(
+        secret: String,
+        command: String = "",
+        pattern: String = "",
+        enablePattern: String? = nil,
+        checkState: Bool = true,
+        caseInsensitive: Bool = true,
+        defaultUsername: String = ""
+    ) async throws -> String {
+        NoEnableBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitEnableMode(exitCommand: String = "exit") async throws -> String {
+        NoEnableBehavior.exit()
     }
 
     // MARK: Session Preparation

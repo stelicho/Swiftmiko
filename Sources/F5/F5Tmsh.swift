@@ -25,8 +25,22 @@ import Foundation
 /// config-mode concept beyond entering tmsh itself — hence NoConfig.
 public final class F5TmshSSH: BaseConnection, NoConfig {
 
-    override public nonisolated var supportsConfigMode: Bool {
-        false
+    // NoConfig: real Netmiko's mixin is a trivial pass-through
+    // (check_config_mode->True, config_mode/exit_config_mode->""),
+    // not a throw — see Sources/NoConfig.swift for why this needs a
+    // direct override rather than a protocol extension default.
+    override public func isInConfigMode(checkString: String = "", pattern: String = "") async throws -> Bool {
+        NoConfigBehavior.isInConfigMode()
+    }
+
+    @discardableResult
+    override public func enterConfigMode(command: String = "", pattern: String = "", dotAll: Bool = false) async throws -> String {
+        NoConfigBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitConfigMode(exitConfig: String = "exit", pattern: String = "") async throws -> String {
+        NoConfigBehavior.exit()
     }
 
     // MARK: Session Preparation

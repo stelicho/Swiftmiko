@@ -33,26 +33,40 @@ open class DigiTransportBase: CiscoBaseConnection, NoEnable, NoConfig {
         )
     }
 
-    override public nonisolated var supportsConfigMode: Bool {
-        false
+    // NoEnable: real Netmiko's mixin is a trivial pass-through
+    // (check_enable_mode->True, enable/exit_enable_mode->"") — see
+    // Sources/NoEnable.swift for why this needs a direct override
+    // rather than a protocol extension default.
+    override public func isInEnableMode(checkString: String = "") async throws -> Bool {
+        NoEnableBehavior.isInEnableMode()
     }
 
     @discardableResult
     override public func enterEnableMode(
         secret: String,
-        command: String = "enable",
-        pattern: String = "ssword",
+        command: String = "",
+        pattern: String = "",
         enablePattern: String? = nil,
         checkState: Bool = true,
         caseInsensitive: Bool = true,
         defaultUsername: String = ""
     ) async throws -> String {
-        _ = secret
-        return ""
+        NoEnableBehavior.enter()
     }
 
-    override public func isInEnableMode(checkString: String = "#") async throws -> Bool {
-        true
+    @discardableResult
+    override public func exitEnableMode(exitCommand: String = "exit") async throws -> String {
+        NoEnableBehavior.exit()
+    }
+
+    // NoConfig: real Netmiko's mixin is likewise a trivial pass-through
+    // (check_config_mode->True, config_mode/exit_config_mode->""), not
+    // a throw — real DigiTransportBase has no custom send_config_set
+    // override either, so sendConfigSet() here just falls through to
+    // BaseConnection's generic implementation once these three return
+    // the no-op values instead of throwing.
+    override public func isInConfigMode(checkString: String = "", pattern: String = "") async throws -> Bool {
+        NoConfigBehavior.isInConfigMode()
     }
 
     @discardableResult
@@ -61,7 +75,7 @@ open class DigiTransportBase: CiscoBaseConnection, NoEnable, NoConfig {
         pattern: String = "",
         dotAll: Bool = false
     ) async throws -> String {
-        throw SwiftmikoError.configModeNotSupported
+        NoConfigBehavior.enter()
     }
 
     @discardableResult
@@ -69,27 +83,7 @@ open class DigiTransportBase: CiscoBaseConnection, NoEnable, NoConfig {
         exitConfig: String = "exit",
         pattern: String = ""
     ) async throws -> String {
-        return ""
-    }
-
-    @discardableResult
-    override public func sendConfigSet(
-        _ commands: [String],
-        exitConfigMode: Bool = true,
-        readTimeout: TimeInterval? = nil,
-        maxLoops: Int? = nil,
-        stripPrompt: Bool = false,
-        stripCommand: Bool = false,
-        configModeCommand: String? = nil,
-        cmdVerify: Bool = true,
-        enterConfigMode: Bool = true,
-        errorPattern: String = "",
-        terminator: String = "#",
-        bypassCommands: String? = nil
-    ) async throws -> String {
-        _ = commands
-        _ = exitConfigMode
-        throw SwiftmikoError.configModeNotSupported
+        NoConfigBehavior.exit()
     }
 
     @discardableResult

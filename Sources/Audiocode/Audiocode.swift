@@ -515,6 +515,36 @@ public final class Audiocode66Telnet: AudiocodeBase66 {}
 /// config-command sequence.
 open class AudiocodeShellBase: AudiocodeBase, NoEnable {
 
+    // NoEnable: real Netmiko's mixin is a trivial pass-through
+    // (check_enable_mode->True, enable/exit_enable_mode->"") — see
+    // Sources/NoEnable.swift for why this needs a direct override
+    // rather than a protocol extension default. Real
+    // AudiocodeShellBase(NoEnable, AudiocodeBase) lists NoEnable
+    // first in its MRO specifically to shadow AudiocodeBase's own
+    // real enable-mode logic (write "enable", wait for a password
+    // prompt, etc.) — this shell-only variant never actually needs it.
+    override public func isInEnableMode(checkString: String = "") async throws -> Bool {
+        NoEnableBehavior.isInEnableMode()
+    }
+
+    @discardableResult
+    override public func enterEnableMode(
+        secret: String,
+        command: String = "",
+        pattern: String = "",
+        enablePattern: String? = nil,
+        checkState: Bool = true,
+        caseInsensitive: Bool = true,
+        defaultUsername: String = ""
+    ) async throws -> String {
+        NoEnableBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitEnableMode(exitCommand: String = "exit") async throws -> String {
+        NoEnableBehavior.exit()
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's session_preparation():

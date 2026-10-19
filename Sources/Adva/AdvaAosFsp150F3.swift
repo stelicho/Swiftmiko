@@ -36,24 +36,58 @@ import Foundation
 /// commands are allowed to echo verification output.
 public final class AdvaAosFsp150F3SSH: CiscoSSHConnection, NoEnable, NoConfig {
 
-    // MARK: Config Mode
-    //
+    // NoConfig: real Netmiko's mixin is a trivial pass-through
+    // (check_config_mode->True, config_mode/exit_config_mode->""),
+    // not a throw — see Sources/NoConfig.swift for why this needs a
+    // direct override rather than a protocol extension default.
     // Deliberately does NOT override supportsConfigMode: disablePaging()
     // below needs sendConfigSet() to keep working (both override it to
     // call super with enterConfigMode: false), and supportsConfigMode
-    // gates sendConfigSet() too, not just enterConfigMode(). What
-    // actually needs to be a no-op is enterConfigMode() itself —
-    // CiscoBaseConnection's inherited implementation sends a real
-    // "configure terminal" and waits for a prompt this device never
-    // produces; F3's real config navigation goes through plain commands
-    // like "configure user-security", not a distinct config mode.
+    // gates sendConfigSet() too, not just enterConfigMode().
+    // CiscoBaseConnection's inherited enterConfigMode() would otherwise
+    // send a real "configure terminal" and wait for a prompt this
+    // device never produces; F3's real config navigation goes through
+    // plain commands like "configure user-security", not a distinct
+    // config mode.
+    override public func isInConfigMode(checkString: String = "", pattern: String = "") async throws -> Bool {
+        NoConfigBehavior.isInConfigMode()
+    }
+
     @discardableResult
     override public func enterConfigMode(
         command: String = "",
         pattern: String = "",
         dotAll: Bool = false
     ) async throws -> String {
-        ""
+        NoConfigBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitConfigMode(exitConfig: String = "exit", pattern: String = "") async throws -> String {
+        NoConfigBehavior.exit()
+    }
+
+    // NoEnable: same trivial-pass-through story — see Sources/NoEnable.swift.
+    override public func isInEnableMode(checkString: String = "") async throws -> Bool {
+        NoEnableBehavior.isInEnableMode()
+    }
+
+    @discardableResult
+    override public func enterEnableMode(
+        secret: String,
+        command: String = "",
+        pattern: String = "",
+        enablePattern: String? = nil,
+        checkState: Bool = true,
+        caseInsensitive: Bool = true,
+        defaultUsername: String = ""
+    ) async throws -> String {
+        NoEnableBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitEnableMode(exitCommand: String = "exit") async throws -> String {
+        NoEnableBehavior.exit()
     }
 
     /// Same "\r\n" line-ending requirement as F2.

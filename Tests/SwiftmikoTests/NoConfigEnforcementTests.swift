@@ -1,21 +1,21 @@
 // Tests/SwiftmikoTests/NoConfigEnforcementTests.swift
 //
-// Regression coverage for the NoConfig marker protocol doing nothing:
-// supportsConfigMode defaulted to true on BaseConnection, and only
-// Digi/DigiTransport.swift overrode it, out of 28 classes conforming
-// to NoConfig — every other one would silently proceed through
-// sendConfigSet()/enterConfigMode() against hardware with no config
-// mode, instead of throwing configModeNotSupported as documented.
+// Regression coverage for the NoConfig marker protocol: verified
+// against real Netmiko's actual no_config.py, NoConfig is a trivial
+// pass-through (check_config_mode->True, config_mode/
+// exit_config_mode->""), not a hard throw. An earlier pass at this
+// fix made every NoConfig-conforming class throw configModeNotSupported
+// instead — backwards from real behavior for all but one real driver.
+// CiscoFtdSSH is that one genuine exception: it explicitly
+// re-overrides send_config_set (raises NotImplementedError) and
+// check_config_mode (returns False) in real Netmiko, instead of using
+// the plain mixin.
 //
-// A handful of NoConfig classes (CloudGenixIonSSH, ZyxelSSH,
-// AdvaAosFsp150F3SSH) are a deliberate exception: they override
-// sendConfigSet() to still push raw commands (with enterConfigMode:
-// false), so supportsConfigMode must stay at its inherited `true`
-// default for them — otherwise sendConfigSet()'s own
-// `guard supportsConfigMode else { throw }` would break their
-// legitimately-working behavior. What needed fixing for those was
-// enterConfigMode() itself being a genuine no-op, matching their
-// "no real config-mode transition ever occurs" doc comments.
+// Swift has no MRO, and a protocol extension default is NOT reachable
+// here — confirmed empirically (see Sources/NoConfig.swift) — so every
+// NoConfig-conforming class needs its own direct override of
+// isInConfigMode()/enterConfigMode()/exitConfigMode(), delegating to
+// NoConfigBehavior.
 
 import Testing
 @testable import Swiftmiko
@@ -31,57 +31,62 @@ struct NoConfigEnforcementTests {
         )
     }
 
-    @Test("Representative NoConfig classes report supportsConfigMode == false")
-    func hardNoConfigClassesDisableConfigMode() {
-        #expect(CheckPointGaiaSSH(profile: testProfile(deviceType: "checkpoint_gaia")).supportsConfigMode == false)
-        #expect(PluribusSSH(profile: testProfile(deviceType: "pluribus")).supportsConfigMode == false)
-        #expect(CiscoFtdSSH(profile: testProfile(deviceType: "cisco_ftd")).supportsConfigMode == false)
-        #expect(F5TmshSSH(profile: testProfile(deviceType: "f5_tmsh")).supportsConfigMode == false)
-        #expect(JuniperScreenOsSSH(profile: testProfile(deviceType: "juniper_screenos")).supportsConfigMode == false)
-        #expect(FortinetSSH(profile: testProfile(deviceType: "fortinet")).supportsConfigMode == false)
-        #expect(NetscalerSSH(profile: testProfile(deviceType: "netscaler")).supportsConfigMode == false)
-        #expect(SophosSfosSSH(profile: testProfile(deviceType: "sophos_sfos")).supportsConfigMode == false)
+    @Test("Representative NoConfig classes trivially succeed rather than throwing")
+    func noConfigClassesSucceedTrivially() async throws {
+        let classes: [BaseConnection] = [
+            CheckPointGaiaSSH(profile: testProfile(deviceType: "checkpoint_gaia")),
+            PluribusSSH(profile: testProfile(deviceType: "pluribus")),
+            F5TmshSSH(profile: testProfile(deviceType: "f5_tmsh")),
+            JuniperScreenOsSSH(profile: testProfile(deviceType: "juniper_screenos")),
+            FortinetSSH(profile: testProfile(deviceType: "fortinet")),
+            NetscalerSSH(profile: testProfile(deviceType: "netscaler")),
+            SophosSfosSSH(profile: testProfile(deviceType: "sophos_sfos")),
+            DigiTransportSSH(profile: testProfile(deviceType: "digi_transport")),
+        ]
+        for connection in classes {
+            #expect(try await connection.isInConfigMode() == true)
+            #expect(try await connection.enterConfigMode() == "")
+            #expect(try await connection.exitConfigMode() == "")
+        }
     }
 
-    @Test("DigiTransportBase (the one pre-existing correct override) is unchanged")
-    func digiTransportStillDisablesConfigMode() {
-        #expect(DigiTransportSSH(profile: testProfile(deviceType: "digi_transport")).supportsConfigMode == false)
+    @Test("CiscoFtdSSH is the one real exception: hard failure, not a no-op")
+    func ciscoFtdHardFails() async throws {
+        let ftd = CiscoFtdSSH(profile: testProfile(deviceType: "cisco_ftd"))
+        #expect(ftd.supportsConfigMode == false)
+        #expect(try await ftd.isInConfigMode() == false)
+        await #expect(throws: (any Error).self) {
+            try await ftd.enterConfigMode()
+        }
     }
 
-    @Test("A driver that doesn't conform to NoConfig keeps the default")
-    func unrelatedDriverKeepsSupportsConfigModeTrue() {
+    @Test("A driver that doesn't conform to NoConfig keeps real config-mode behavior")
+    func unrelatedDriverKeepsRealBehavior() {
         #expect(CiscoSSHConnection(profile: testProfile(deviceType: "cisco_ios")).supportsConfigMode == true)
     }
 
     @Test(
-        "\"Soft\" NoConfig classes keep supportsConfigMode true (their sendConfigSet() depends on it)",
+        "\"Soft\" NoConfig classes (own sendConfigSet override) are also trivial pass-throughs",
         arguments: [
             "cloudgenix_ion" as String,
             "zyxel",
             "adva_aos_fsp_150_f3",
         ]
     )
-    func softNoConfigClassesKeepSupportsConfigModeTrue(deviceType: String) {
+    func softNoConfigClassesAreTrivialPassThroughs(deviceType: String) async throws {
         let profile = testProfile(deviceType: deviceType)
+        let connection: BaseConnection
         switch deviceType {
         case "cloudgenix_ion":
-            #expect(CloudGenixIonSSH(profile: profile).supportsConfigMode == true)
+            connection = CloudGenixIonSSH(profile: profile)
         case "zyxel":
-            #expect(ZyxelSSH(profile: profile).supportsConfigMode == true)
+            connection = ZyxelSSH(profile: profile)
         default:
-            #expect(AdvaAosFsp150F3SSH(profile: profile).supportsConfigMode == true)
+            connection = AdvaAosFsp150F3SSH(profile: profile)
         }
-    }
-
-    @Test("Soft NoConfig classes' enterConfigMode() is a genuine no-op, not a real transition")
-    func softNoConfigEnterConfigModeIsANoOp() async throws {
-        let cloudgenix = CloudGenixIonSSH(profile: testProfile(deviceType: "cloudgenix_ion"))
-        #expect(try await cloudgenix.enterConfigMode() == "")
-
-        let zyxel = ZyxelSSH(profile: testProfile(deviceType: "zyxel"))
-        #expect(try await zyxel.enterConfigMode() == "")
-
-        let advaF3 = AdvaAosFsp150F3SSH(profile: testProfile(deviceType: "adva_aos_fsp_150_f3"))
-        #expect(try await advaF3.enterConfigMode() == "")
+        #expect(connection.supportsConfigMode == true)
+        #expect(try await connection.isInConfigMode() == true)
+        #expect(try await connection.enterConfigMode() == "")
+        #expect(try await connection.exitConfigMode() == "")
     }
 }

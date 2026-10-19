@@ -221,9 +221,14 @@ public final class CiscoFtdSSH: CiscoSSHConnection, NoConfig {
     /// Maps to netmiko's:
     ///     def check_config_mode(self, check_string="", ...): return False
     ///
-    /// NoConfig protocol provides sendConfigSet() → throws notImplemented.
-    /// This override ensures isInConfigMode() always returns false so
-    /// any callers that check before acting get a clean answer.
+    /// FTD is the one real exception in the NoConfig-conforming set:
+    /// real Netmiko's NoConfig mixin is a trivial pass-through
+    /// (check_config_mode->True, config_mode/exit_config_mode->"") —
+    /// see Sources/NoConfig.swift — but CiscoFtdSSH explicitly
+    /// re-overrides check_config_mode to False and send_config_set to
+    /// raise NotImplementedError instead, which supportsConfigMode
+    /// above replicates for sendConfigSet()/enterConfigMode(). This
+    /// override does the same for isInConfigMode() specifically.
     override public func isInConfigMode(
         checkString: String = "",
         pattern: String = ""

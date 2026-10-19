@@ -78,6 +78,32 @@ public struct PaloAltoInteractiveAuthHandler {
 /// check_enable_mode() are explicitly disabled.
 open class PaloAltoPanosBase: BaseConnection, NoEnable {
 
+    // NoEnable: real Netmiko's mixin is a trivial pass-through
+    // (check_enable_mode->True, enable/exit_enable_mode->"") — see
+    // Sources/NoEnable.swift for why this needs a direct override
+    // rather than a protocol extension default.
+    override public func isInEnableMode(checkString: String = "") async throws -> Bool {
+        NoEnableBehavior.isInEnableMode()
+    }
+
+    @discardableResult
+    override public func enterEnableMode(
+        secret: String,
+        command: String = "",
+        pattern: String = "",
+        enablePattern: String? = nil,
+        checkState: Bool = true,
+        caseInsensitive: Bool = true,
+        defaultUsername: String = ""
+    ) async throws -> String {
+        NoEnableBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitEnableMode(exitCommand: String = "exit") async throws -> String {
+        NoEnableBehavior.exit()
+    }
+
     override public nonisolated var promptPattern: String { "[>#]" }
 
     // MARK: Session Preparation
