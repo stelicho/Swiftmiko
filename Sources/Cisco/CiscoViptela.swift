@@ -124,22 +124,32 @@ public final class CiscoViptelaSSH: CiscoSSHConnection {
 
         try await writeChannel(normalizeCommand(exitConfig))
 
-        // Wait for command echo to avoid getting out of sync with the channel
+        // Wait for command echo to avoid getting out of sync with the
+        // channel. Accumulate into `output` (rather than discarding
+        // it) — a fast device can send its post-command response in
+        // the SAME read as the echo, and a real network channel gives
+        // no guarantee that content is still there to read again on a
+        // later, separate wait call.
+        var output = ""
         if cmdVerifyEnabled {
-            _ = try await readUntilPattern(
+            output += try await readUntilPattern(
                 pattern: NSRegularExpression.escapedPattern(for: exitConfig.trimmingCharacters(in: .whitespaces))
             )
         }
 
-        // Check if we landed at the prompt or hit the uncommitted changes question
-        let uncommittedPattern = "Uncommitted changes found"
-        let combinedPattern = "(\(pattern)|\(uncommittedPattern))"
-        var output = try await readUntilPattern(pattern: combinedPattern)
+        // Only wait for more if the echo read didn't already capture
+        // the exit pattern — otherwise this would wait on data that
+        // was already consumed and will never arrive again.
+        if output.range(of: pattern, options: .regularExpression) == nil {
+            let uncommittedPattern = "Uncommitted changes found"
+            let combinedPattern = "(\(pattern)|\(uncommittedPattern))"
+            output += try await readUntilPattern(pattern: combinedPattern)
 
-        if output.contains(uncommittedPattern) {
-            // Answer "no" — discard changes, do not commit automatically
-            try await writeChannel(normalizeCommand("no"))
-            output += try await readUntilPattern(pattern: pattern)
+            if output.contains(uncommittedPattern) {
+                // Answer "no" — discard changes, do not commit automatically
+                try await writeChannel(normalizeCommand("no"))
+                output += try await readUntilPattern(pattern: pattern)
+            }
         }
 
         if try await isInConfigMode() {

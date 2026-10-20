@@ -452,6 +452,35 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertEqual(channel.writes[1], "\n")
     }
 
+    // MARK: - Cisco Viptela: exitConfigMode() discarded the command-echo
+    // read's result and then unconditionally did a second, separate read —
+    // if the device's post-"end" response arrived in the SAME burst as the
+    // echo (common on a fast session), that content was already consumed
+    // and gone, so the second read would hang until readTimeout.
+
+    func testCiscoViptelaExitConfigModeDoesNotHangWhenPromptArrivesWithTheEcho() async throws {
+        let channel = ScriptedChannel(responses: [
+            "host(config)#",   // isInConfigMode()'s initial guard check
+            "end\r\nhost#",    // echo AND the prompt arrive together —
+                                // nothing more is ever sent after this,
+                                // matching a real channel with no more
+                                // data to give an extra, unnecessary read
+        ])
+        try await channel.open()
+        let profile = ConnectionProfile(
+            host: "203.0.113.1",
+            deviceType: "cisco_viptela",
+            username: "netadmin",
+            auth: .none,
+            readTimeout: 2.0
+        )
+        let connection = CiscoViptelaSSH(profile: profile, channel: channel)
+
+        let output = try await connection.exitConfigMode()
+
+        XCTAssertTrue(output.contains("host#"))
+    }
+
     // MARK: - Aviat WTM: sessionPreparation() silently dropped the entire
     // "if allow_auto_change: disable_paging(); commit()" branch real
     // Netmiko has, and the class was also missing NoEnable conformance
