@@ -187,7 +187,12 @@ public final class DellOS10FileTransfer: SCPHandler {
         switch direction {
         case .put:
             let output = try await connection.sendCommand(remoteCommand)
-            let searchString = "Directory contents .*\(destinationFile)"
+            // (?s) makes "." span newlines (Python's re.DOTALL) — the
+            // directory header and the destination filename's own
+            // listing line are virtually always on different lines of
+            // real `dir` output, so without this the match never
+            // succeeds even when the file genuinely exists.
+            let searchString = "(?s)Directory contents .*\(destinationFile)"
             return output.range(
                 of: searchString,
                 options: [.regularExpression, .caseInsensitive]

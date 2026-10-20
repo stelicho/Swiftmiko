@@ -208,6 +208,33 @@ final class SCPHandlerRegressionTests: XCTestCase {
     // and sourceMD5 never accounted for the trailing newline Cisco IOS
     // automatically appends when writing via TCL's `puts`.
 
+    // MARK: - Dell OS10: checkFileExists()'s regex couldn't span the newline
+    // between the "Directory contents" header and the actual file-listing
+    // line of real `dir home` output, so it always reported false even
+    // when the destination file genuinely existed.
+
+    func testDellOS10CheckFileExistsMatchesAcrossMultipleLinesOfDirectoryOutput() async throws {
+        let channel = BufferedChannel()
+        try await channel.open()
+        channel.enqueueOutput(
+            "Directory contents of home:\nMode  Size  Name\n-rw-r--r-- 123 myfile.txt\nswitch#"
+        )
+        let connection = CiscoSSHConnection(profile: testProfile(deviceType: "dell_os10"), channel: channel)
+        let tempFile = makeTempFile()
+        defer { try? FileManager.default.removeItem(atPath: tempFile) }
+
+        let handler = try await DellOS10FileTransfer(
+            connection: connection,
+            sourceFile: tempFile,
+            destFile: "myfile.txt",
+            direction: .put
+        )
+
+        let exists = try await handler.checkFileExists()
+
+        XCTAssertTrue(exists)
+    }
+
     func testInLineTransferSourceConfigOnlyConstructionDoesNotThrow() async throws {
         let channel = BufferedChannel()
         let connection = CiscoIOSSSH(profile: testProfile(deviceType: "cisco_ios"), channel: channel)
