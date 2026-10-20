@@ -512,6 +512,40 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertEqual(connection.effectiveReturnCharacter, "\n")
     }
 
+    // MARK: - RuckusFastironTelnet / RuijieOSTelnet: both Telnet drivers
+    // were missing their custom init forcing a "\r\n" default line
+    // ending — RuckusFastironTelnet was also missing its ECHO-option
+    // Telnet negotiation entirely (FastIron/ICX doesn't echo commands
+    // over Telnet by default without it).
+
+    func testRuckusFastironTelnetDefaultsToCarriageReturnLineFeed() {
+        // Explicit empty string simulates a caller who never set
+        // returnCharacter at all — ConnectionProfile's own default is
+        // already "\n" (not empty), so a profile built via the usual
+        // testProfile() helper would never exercise this override.
+        let profile = ConnectionProfile(
+            host: "203.0.113.1",
+            deviceType: "ruckus_fastiron_telnet",
+            username: "netadmin",
+            auth: .none,
+            returnCharacter: ""
+        )
+        let connection = RuckusFastironTelnet(profile: profile)
+        XCTAssertEqual(connection.profile.returnCharacter, "\r\n")
+    }
+
+    func testRuijieOSTelnetDefaultsToCarriageReturnLineFeed() {
+        let profile = ConnectionProfile(
+            host: "203.0.113.1",
+            deviceType: "ruijie_os_telnet",
+            username: "netadmin",
+            auth: .none,
+            returnCharacter: ""
+        )
+        let connection = RuijieOSTelnet(profile: profile)
+        XCTAssertEqual(connection.profile.returnCharacter, "\r\n")
+    }
+
     // MARK: - Aviat WTM: sessionPreparation() silently dropped the entire
     // "if allow_auto_change: disable_paging(); commit()" branch real
     // Netmiko has, and the class was also missing NoEnable conformance

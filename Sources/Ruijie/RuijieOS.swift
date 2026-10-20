@@ -60,5 +60,28 @@ public final class RuijieOSSSH: RuijieOSBase {}
 
 /// Ruijie RGOS Telnet driver.
 ///
-/// Maps to netmiko's RuijieOSTelnet(RuijieOSBase).
-public final class RuijieOSTelnet: RuijieOSBase {}
+/// Maps to netmiko's RuijieOSTelnet(RuijieOSBase). Overrides the
+/// default line ending to "\r\n" unless the caller's profile already
+/// specifies one.
+public final class RuijieOSTelnet: RuijieOSBase {
+
+    public init(
+        profile: ConnectionProfile,
+        sessionLog: SessionLogConfig? = nil,
+        loggerEnabled: Bool = true,
+        channel: (any Channel)? = nil,
+        channelProvider: ChannelProvider? = nil
+    ) {
+        var adjustedProfile = profile
+        if adjustedProfile.returnCharacter.isEmpty {
+            adjustedProfile.returnCharacter = "\r\n"
+        }
+        super.init(
+            profile: adjustedProfile,
+            sessionLog: sessionLog,
+            loggerEnabled: loggerEnabled,
+            channel: channel,
+            channelProvider: channelProvider
+        )
+    }
+}
