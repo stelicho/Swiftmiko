@@ -407,6 +407,51 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertTrue(inConfig)
     }
 
+    // MARK: - Cisco ASA: missing __init__(allow_auto_change=True), missing
+    // sessionPreparation()/asaLogin() entirely (fell back to BaseConnection's
+    // fully generic defaults), and sendCommand() not forcing a "#" wait for
+    // "changeto" multi-context commands when the caller didn't supply their
+    // own expectString.
+
+    func testCiscoASAInitForcesAllowAutoChangeTrue() {
+        let profile = testProfile(deviceType: "cisco_asa")
+        XCTAssertFalse(profile.allowAutoChange)
+
+        // Before the fix, CiscoASASSH had no custom init at all, so
+        // allowAutoChange stayed whatever the caller's profile said —
+        // sessionPreparation()'s terminal-width step is gated on this
+        // flag being true.
+        let connection = CiscoASASSH(profile: profile)
+        XCTAssertTrue(connection.profile.allowAutoChange)
+    }
+
+    func testCiscoASASendCommandForcesHashWaitAndRedetectsBasePromptAfterChangeto() async throws {
+        let channel = ScriptedChannel(responses: [
+            "changeto context a\nctx-a#",
+            "ctx-a#",
+        ])
+        try await channel.open()
+        let connection = CiscoASASSH(
+            profile: testProfile(deviceType: "cisco_asa"),
+            channel: channel
+        )
+        connection.basePrompt = "asa#"
+
+        _ = try await connection.sendCommand("changeto context a")
+
+        // Before the fix, a "changeto" command with no caller-supplied
+        // expectString would wait on the STALE prior-context prompt
+        // pattern rather than being forced to "#" — and the
+        // re-detection write (setBasePrompt()'s own bare return,
+        // triggered by the "changeto" check below) wouldn't happen at
+        // all since CiscoASASSH's own sendCommand() override had no
+        // test coverage proving it actually ran.
+        XCTAssertEqual(channel.writes.count, 2)
+        guard channel.writes.count == 2 else { return }
+        XCTAssertTrue(channel.writes[0].hasPrefix("changeto context a"))
+        XCTAssertEqual(channel.writes[1], "\n")
+    }
+
     // MARK: - Aviat WTM: sessionPreparation() silently dropped the entire
     // "if allow_auto_change: disable_paging(); commit()" branch real
     // Netmiko has, and the class was also missing NoEnable conformance
