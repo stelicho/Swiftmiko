@@ -50,7 +50,17 @@ public final class TextFSMTemplate {
             guard line.hasPrefix("Value ") else {
                 throw TextFSMTemplateError.malformedValueLine(line: line, lineNumber: lineNumber)
             }
-            parsedValues.append(try TextFSMValue(line: line, lineNumber: lineNumber))
+            let value = try TextFSMValue(line: line, lineNumber: lineNumber)
+            // Mirrors textfsm's `if value.name in self.header: raise ...` —
+            // a duplicate Value name isn't just redundant: valueTemplates
+            // below would silently overwrite the ${Name} substitution for
+            // the first declaration, and matchedValues() only ever finds
+            // the FIRST same-named TextFSMValue object by name, so the
+            // second declaration's own assign()/clearVar() would never run.
+            guard !parsedValues.contains(where: { $0.name == value.name }) else {
+                throw TextFSMTemplateError.duplicateValueName(name: value.name, lineNumber: lineNumber)
+            }
+            parsedValues.append(value)
         }
 
         var valueTemplates: [String: String] = [:]
@@ -82,10 +92,30 @@ public final class TextFSMTemplate {
                 // exact "missing whitespace or caret" error applies here.
                 throw TextFSMTemplateError.missingRuleIndentation(line: line, lineNumber: lineNumber)
             } else {
-                guard line.range(of: "^\\w+$", options: .regularExpression) != nil else {
+                // Mirrors textfsm's state_name_re match plus its length and
+                // reserved-word checks — a state can't be named the same as
+                // a line/record operator (e.g. a state literally named
+                // "Record" or "Next"), and is capped at the same 48-char
+                // limit as Value names.
+                // Mirrors textfsm's state_name_re match plus its length and
+                // reserved-word checks — a state can't be named the same as
+                // a line/record operator (e.g. a state literally named
+                // "Record" or "Next"), and is capped at the same 48-char
+                // limit as Value names.
+                guard line.range(of: "^\\w+$", options: .regularExpression) != nil,
+                      line.count <= 48,
+                      TextFSMLineOp(rawValue: line) == nil,
+                      TextFSMRecordOp(rawValue: line) == nil else {
                     throw TextFSMTemplateError.invalidStateName(name: line, lineNumber: lineNumber)
                 }
-                if states[line] == nil { states[line] = [] }
+                // Mirrors textfsm's `if state_name in self.states: raise
+                // ...` — silently merging two separately-declared state
+                // blocks with the same name (as an earlier version of this
+                // file did) hides what's almost certainly a template typo.
+                guard states[line] == nil else {
+                    throw TextFSMTemplateError.duplicateStateName(name: line, lineNumber: lineNumber)
+                }
+                states[line] = []
                 currentState = line
             }
         }

@@ -227,6 +227,99 @@ final class TextFSMTests: XCTestCase {
         }
     }
 
+    // MARK: - Validation gaps found in a fresh adversarial pass against
+    // real textfsm (compared directly against installed `textfsm` package
+    // behavior, not just documentation)
+
+    func testDuplicateOptionOnTheSameValueIsRejected() {
+        // Confirmed against real textfsm: `Value List,List Foo (...)`
+        // raises `Duplicate option "List"` rather than silently doubling
+        // every OnAssignVar effect (appending each matched value twice).
+        XCTAssertThrowsError(try TextFSMTemplate(templateString: """
+        Value List,List FOO (\\S+)
+
+        Start
+          ^${FOO} -> Record
+        """)) { error in
+            guard case TextFSMTemplateError.duplicateOption = error else {
+                XCTFail("Expected duplicateOption, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testQuotedNewStateIsRejectedForNonErrorLineOps() throws {
+        // Confirmed against real textfsm: a quoted new-state name is only
+        // valid for the Error line op — `-> Next "Foo"` must be rejected
+        // because validation runs against the RAW (still-quoted) text,
+        // not the unquoted text. Quote-stripping before validating (as an
+        // earlier version of this file did) would let this slip through.
+        XCTAssertThrowsError(try TextFSMTemplate(templateString: """
+        Value A (\\d+)
+
+        Start
+          ^A=${A} -> Next "QuotedState"
+
+        QuotedState
+          ^end -> Record
+        """)) { error in
+            guard case TextFSMTemplateError.invalidStateName = error else {
+                XCTFail("Expected invalidStateName, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testDuplicateValueNameIsRejected() {
+        XCTAssertThrowsError(try TextFSMTemplate(templateString: """
+        Value FOO (\\S+)
+        Value FOO (\\d+)
+
+        Start
+          ^${FOO} -> Record
+        """)) { error in
+            guard case TextFSMTemplateError.duplicateValueName = error else {
+                XCTFail("Expected duplicateValueName, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testDuplicateStateNameIsRejected() {
+        XCTAssertThrowsError(try TextFSMTemplate(templateString: """
+        Value A (\\d+)
+
+        Start
+          ^A=${A} -> Record
+
+        Start
+          ^other -> Record
+        """)) { error in
+            guard case TextFSMTemplateError.duplicateStateName = error else {
+                XCTFail("Expected duplicateStateName, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testStateNameClashingWithAReservedLineOrRecordOperatorIsRejected() {
+        // "Record" (a RECORD_OP token) can't also be used as a state name.
+        XCTAssertThrowsError(try TextFSMTemplate(templateString: """
+        Value A (\\d+)
+
+        Start
+          ^A=${A} -> Next Record
+
+        Record
+          ^other -> Record
+        """)) { error in
+            guard case TextFSMTemplateError.invalidStateName = error else {
+                XCTFail("Expected invalidStateName, got \(error)")
+                return
+            }
+        }
+    }
+
     /// Full run against a real, completely unmodified ntc-templates file
     /// (networktocode/ntc-templates: cisco_ios_show_version.textfsm) —
     /// the actual point of a native engine is working against the real

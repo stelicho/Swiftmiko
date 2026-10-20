@@ -72,19 +72,25 @@ final class TextFSMRule {
             return
         }
 
-        let (lineOp, recordOp, newState) = try Self.parseAction(actionText, lineNumber: lineNumber)
+        let (lineOp, recordOp, rawNewState) = try Self.parseAction(actionText, lineNumber: lineNumber)
 
-        if lineOp == .continue, !newState.isEmpty {
+        if lineOp == .continue, !rawNewState.isEmpty {
             throw TextFSMTemplateError.continueWithNewState(lineNumber: lineNumber)
         }
-        if lineOp != .error, !newState.isEmpty,
-           newState.range(of: "^\\w+", options: .regularExpression) == nil {
-            throw TextFSMTemplateError.invalidStateName(name: newState, lineNumber: lineNumber)
+        // Validated against the RAW (still-quoted) text, matching upstream's
+        // `re.match(r'\w+', self.new_state)` — a quoted state name like
+        // `"Foo"` must be rejected for every line op except Error, since
+        // `"` isn't a word character. Stripping quotes first (as an earlier
+        // version of this file did) would let a quoted non-Error state name
+        // slip through, since the UNQUOTED text alone can look alphanumeric.
+        if lineOp != .error, !rawNewState.isEmpty,
+           rawNewState.range(of: "^\\w+", options: .regularExpression) == nil {
+            throw TextFSMTemplateError.invalidStateName(name: rawNewState, lineNumber: lineNumber)
         }
 
         self.lineOp = lineOp
         self.recordOp = recordOp
-        self.newState = newState
+        self.newState = Self.stripQuotes(rawNewState)
     }
 
     /// Named-group captures from a successful match against this rule's
@@ -188,10 +194,13 @@ final class TextFSMRule {
     ) throws -> (TextFSMLineOp, TextFSMRecordOp, String) {
         let range = NSRange(action.startIndex..., in: action)
 
+        // Deliberately does NOT strip quotes here — the caller validates
+        // "newstate" against the raw (possibly still-quoted) text first;
+        // see the comment at the call site in init().
         func group(_ result: NSTextCheckingResult, _ name: String) -> String? {
             let r = result.range(withName: name)
             guard r.location != NSNotFound, let swiftRange = Range(r, in: action) else { return nil }
-            return stripQuotes(String(action[swiftRange]))
+            return String(action[swiftRange])
         }
 
         if let result = actionRE.firstMatch(in: action, range: range) {

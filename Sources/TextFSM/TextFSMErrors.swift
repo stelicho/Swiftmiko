@@ -24,12 +24,15 @@ public enum TextFSMTemplateError: Error, CustomStringConvertible, Sendable {
     case malformedValueLine(line: String, lineNumber: Int)
     case invalidValueName(name: String, lineNumber: Int)
     case unknownOption(option: String, lineNumber: Int)
+    case duplicateOption(option: String, lineNumber: Int)
     case regexNotParenthesized(regex: String, lineNumber: Int)
     case invalidRegex(regex: String, lineNumber: Int)
     case malformedRuleLine(line: String, lineNumber: Int)
     case missingRuleIndentation(line: String, lineNumber: Int)
     case continueWithNewState(lineNumber: Int)
     case invalidStateName(name: String, lineNumber: Int)
+    case duplicateValueName(name: String, lineNumber: Int)
+    case duplicateStateName(name: String, lineNumber: Int)
     case unknownNewState(state: String, fromState: String)
     case terminalStateNotEmpty(state: String)
     case missingStartState
@@ -43,6 +46,8 @@ public enum TextFSMTemplateError: Error, CustomStringConvertible, Sendable {
             return "Line \(n): invalid Value name '\(name)' or name too long"
         case .unknownOption(let option, let n):
             return "Line \(n): unknown Value option '\(option)'"
+        case .duplicateOption(let option, let n):
+            return "Line \(n): duplicate option \"\(option)\""
         case .regexNotParenthesized(let regex, let n):
             return "Line \(n): Value regex '\(regex)' must be contained within a '()' pair"
         case .invalidRegex(let regex, let n):
@@ -55,6 +60,10 @@ public enum TextFSMTemplateError: Error, CustomStringConvertible, Sendable {
             return "Line \(n): 'Continue' line operator cannot specify a new state"
         case .invalidStateName(let name, let n):
             return "Line \(n): invalid state name '\(name)' — alphanumeric characters only"
+        case .duplicateValueName(let name, let n):
+            return "Line \(n): duplicate declarations for Value '\(name)'"
+        case .duplicateStateName(let name, let n):
+            return "Line \(n): duplicate state name '\(name)'"
         case .unknownNewState(let state, let from):
             return "State '\(state)' not found, referenced in state '\(from)'"
         case .terminalStateNotEmpty(let state):

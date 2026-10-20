@@ -97,6 +97,14 @@ final class TextFSMValue {
                 guard let option = TextFSMValueOption(rawValue: optionToken) else {
                     throw TextFSMTemplateError.unknownOption(option: optionToken, lineNumber: lineNumber)
                 }
+                // Mirrors textfsm's TextFSMValue._AddOption: a duplicate
+                // option isn't just redundant — for List it would double
+                // every OnAssignVar effect (appending each matched value
+                // twice), so real textfsm rejects it outright at parse
+                // time rather than silently accepting it.
+                guard !options.contains(option) else {
+                    throw TextFSMTemplateError.duplicateOption(option: optionToken, lineNumber: lineNumber)
+                }
                 options.append(option)
             }
             name = tokens[2]
