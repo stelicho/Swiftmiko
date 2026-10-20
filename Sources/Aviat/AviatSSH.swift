@@ -11,10 +11,48 @@
 import Foundation
 
 // Aviat WTM Outdoor Radio support.
-open class AviatWTMSSH: CiscoSSHConnection {
+//
+// Maps to netmiko's AviatWTMSSH(NoEnable, CiscoSSHConnection) — this
+// platform has no enable mode at all.
+open class AviatWTMSSH: CiscoSSHConnection, NoEnable {
 
+    // NoEnable: real Netmiko's mixin is a trivial pass-through
+    // (check_enable_mode->True, enable/exit_enable_mode->"") — see
+    // Sources/NoEnable.swift for why this needs a direct override
+    // rather than a protocol extension default.
+    override public func isInEnableMode(checkString: String = "") async throws -> Bool {
+        NoEnableBehavior.isInEnableMode()
+    }
+
+    @discardableResult
+    override public func enterEnableMode(
+        secret: String,
+        command: String = "",
+        pattern: String = "",
+        enablePattern: String? = nil,
+        checkState: Bool = true,
+        caseInsensitive: Bool = true,
+        defaultUsername: String = ""
+    ) async throws -> String {
+        NoEnableBehavior.enter()
+    }
+
+    @discardableResult
+    override public func exitEnableMode(exitCommand: String = "exit") async throws -> String {
+        NoEnableBehavior.exit()
+    }
+
+    // Changes entered in config mode are staged in a candidate buffer
+    // and don't take effect until committed — if the caller opted
+    // into automatic device changes, disable paging and commit
+    // immediately so session setup leaves the device in a usable
+    // state.
     override public func sessionPreparation() async throws {
         try await testChannelRead()
+        if profile.allowAutoChange {
+            try await disablePaging()
+            try await commit()
+        }
         try await setBasePrompt()
     }
 
@@ -107,6 +145,7 @@ open class AviatWTMSSH: CiscoSSHConnection {
     }
 
     // Commit configuration changes on Aviat WTM devices.
+    @discardableResult
     func commit(command: String = "commit", readTimeout: TimeInterval = 120.0) async throws -> String {
         guard try await isInConfigMode() else {
             throw SwiftmikoError.commandFailed("Must be in configuration mode to commit.")

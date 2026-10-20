@@ -42,6 +42,8 @@ struct NoEnableEnforcementTests {
             NokiaSrlSSH(profile: testProfile(deviceType: "nokia_srl")),
             NokiaIsamSSH(profile: testProfile(deviceType: "nokia_isam")),
             DigiTransportSSH(profile: testProfile(deviceType: "digi_transport")),
+            AviatWTMSSH(profile: testProfile(deviceType: "aviat_wtm")),
+            BintecBossSSH(profile: testProfile(deviceType: "bintec_boss")),
         ]
         for connection in classes {
             // BaseConnection's own default enterEnableMode() throws

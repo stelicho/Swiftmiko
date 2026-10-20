@@ -42,6 +42,7 @@ struct NoConfigEnforcementTests {
             NetscalerSSH(profile: testProfile(deviceType: "netscaler")),
             SophosSfosSSH(profile: testProfile(deviceType: "sophos_sfos")),
             DigiTransportSSH(profile: testProfile(deviceType: "digi_transport")),
+            BintecBossSSH(profile: testProfile(deviceType: "bintec_boss")),
         ]
         for connection in classes {
             #expect(try await connection.isInConfigMode() == true)

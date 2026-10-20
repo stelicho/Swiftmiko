@@ -406,4 +406,37 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("configure") })
         XCTAssertTrue(inConfig)
     }
+
+    // MARK: - Aviat WTM: sessionPreparation() silently dropped the entire
+    // "if allow_auto_change: disable_paging(); commit()" branch real
+    // Netmiko has, and the class was also missing NoEnable conformance
+    // (this platform has no enable mode at all).
+
+    func testAviatWTMSessionPreparationDisablesPagingAndCommitsWhenAutoChangeIsAllowed() async throws {
+        // Every distinct wait in the sequence (testChannelRead's fixed
+        // 2s timing read, enterConfigMode, the disablePaging command,
+        // findPrompt inside commit's isInConfigMode check, commit's
+        // own read, and setBasePrompt) only needs the SAME matching
+        // string as its next unconsumed response — repeating it widely
+        // sidesteps having to predict exactly how many timing-read
+        // iterations the fixed 2-second window consumes.
+        let channel = ScriptedChannel(responses: Array(repeating: "router(config)#\n", count: 60))
+        try await channel.open()
+        let profile = ConnectionProfile(
+            host: "203.0.113.1",
+            deviceType: "aviat_wtm",
+            username: "netadmin",
+            auth: .none,
+            allowAutoChange: true
+        )
+        let connection = AviatWTMSSH(profile: profile, channel: channel)
+
+        // Before the fix, sessionPreparation() never checked
+        // allowAutoChange at all — disablePaging()/commit() were
+        // simply never called, regardless of the flag.
+        try await connection.sessionPreparation()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("session paginate false") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("commit") })
+    }
 }
