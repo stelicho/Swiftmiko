@@ -264,6 +264,21 @@ open class BaseConnection: DeviceDriver {
     /// session prep.
     public var ansiEscapeCodes: Bool = false
 
+    /// Was entirely absent — `profile` is immutable and its
+    /// returnCharacter is read inline at dozens of call sites across
+    /// the whole driver set, so there was no way for a driver to
+    /// change its own outbound line ending at runtime. Confirmed
+    /// needed by OneAccess ONEOS, which probes whether it's talking to
+    /// ONEOS5 or ONEOS6 during session prep and must switch to "\n"
+    /// specifically for ONEOS6 (real Netmiko does `self.RETURN = "\n"`
+    /// directly). Scoped narrowly: only BaseConnection's own shared
+    /// write paths consult this, not every driver's own direct
+    /// `profile.returnCharacter` usage — no other driver needs this.
+    internal var returnCharacterOverride: String?
+    public var effectiveReturnCharacter: String {
+        returnCharacterOverride ?? profile.returnCharacter
+    }
+
     /// Was entirely absent. Confirmed needed by Silver Peak, Casa
     /// CMTS, HP Comware, Nokia SR OS. `nil` defers to the per-call
     /// default (true).
@@ -520,7 +535,7 @@ open class BaseConnection: DeviceDriver {
         cmdVerify: Bool = true,
         autoFindPrompt: Bool = true
     ) async throws -> String {
-        try await writeChannel(command + profile.returnCharacter)
+        try await writeChannel(command + effectiveReturnCharacter)
         var output: String
         if let expectString {
             output = try await readUntilPromptOrPattern(pattern: expectString, timeout: readTimeout)
@@ -544,7 +559,7 @@ open class BaseConnection: DeviceDriver {
         stripCommand: Bool = true,
         cmdVerify: Bool = true
     ) async throws -> String {
-        try await writeChannel(command + profile.returnCharacter)
+        try await writeChannel(command + effectiveReturnCharacter)
         try await Task.sleep(nanoseconds: UInt64(readTimeout * 1_000_000_000))
         var output = try await readChannel()
         if stripCommand { output = self.stripCommand(command, output: output) }
@@ -635,7 +650,7 @@ open class BaseConnection: DeviceDriver {
         delay: TimeInterval = 1.0,
         pattern: String? = nil
     ) async throws {
-        try await writeChannel(profile.returnCharacter)
+        try await writeChannel(effectiveReturnCharacter)
         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         let searchPattern = pattern ?? "[\(primaryTerminator)\(altTerminator)]"
         let output = try await readUntilPattern(pattern: searchPattern)
@@ -654,7 +669,7 @@ open class BaseConnection: DeviceDriver {
         delay: TimeInterval = 1.0,
         pattern: String? = nil
     ) async throws -> String {
-        try await writeChannel(profile.returnCharacter)
+        try await writeChannel(effectiveReturnCharacter)
         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         let output = try await readChannel()
         if let pattern, !pattern.isEmpty {
@@ -713,7 +728,7 @@ open class BaseConnection: DeviceDriver {
     ) async throws {
         guard !command.isEmpty else { return }
         let waitPattern = pattern ?? command
-        try await writeChannel(command + profile.returnCharacter)
+        try await writeChannel(command + effectiveReturnCharacter)
         _ = try await readUntilPattern(pattern: waitPattern)
     }
 
@@ -800,7 +815,7 @@ open class BaseConnection: DeviceDriver {
         checkString: String,
         pattern: String = ""
     ) async throws -> Bool {
-        try await writeChannel(profile.returnCharacter)
+        try await writeChannel(effectiveReturnCharacter)
         let output = try await readUntilPattern(pattern: pattern.isEmpty ? promptPattern : pattern)
         return output.range(of: checkString, options: .regularExpression) != nil
     }
@@ -929,7 +944,7 @@ open class BaseConnection: DeviceDriver {
     /// logout banners/confirmations.
     open func cleanup(command: String = "exit") async throws {
         sessionLog?.fin = true
-        try await writeChannel(command + profile.returnCharacter)
+        try await writeChannel(command + effectiveReturnCharacter)
     }
 
     open func autodetectFileSystem(
@@ -987,7 +1002,7 @@ open class BaseConnection: DeviceDriver {
     ) async throws -> String {
         if checkState, try await isInEnableMode() { return "" }
 
-        try await writeChannel(command + profile.returnCharacter)
+        try await writeChannel(command + effectiveReturnCharacter)
         var output = try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
 
         let sawPasswordPrompt = output.range(
@@ -1000,7 +1015,7 @@ open class BaseConnection: DeviceDriver {
                     "Enable password required for \(profile.host), but no secret was provided"
                 )
             }
-            try await writeChannel(secretToSend + profile.returnCharacter)
+            try await writeChannel(secretToSend + effectiveReturnCharacter)
             output += try await readUntilPromptOrPattern(
                 pattern: enablePattern ?? promptPattern, timeout: profile.readTimeout
             )
@@ -1032,7 +1047,7 @@ open class BaseConnection: DeviceDriver {
         pattern: String,
         dotAll: Bool = false
     ) async throws -> String {
-        try await writeChannel(command + profile.returnCharacter)
+        try await writeChannel(command + effectiveReturnCharacter)
         inConfigMode = true
         if pattern.isEmpty {
             return try await readUntilPrompt(timeout: profile.readTimeout)
@@ -1051,7 +1066,7 @@ open class BaseConnection: DeviceDriver {
         pattern: String
     ) async throws -> String {
         guard try await isInConfigMode() else { return "" }
-        try await writeChannel(exitConfig + profile.returnCharacter)
+        try await writeChannel(exitConfig + effectiveReturnCharacter)
         let output = pattern.isEmpty
             ? try await readUntilPrompt(timeout: profile.readTimeout)
             : try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
@@ -1094,7 +1109,7 @@ open class BaseConnection: DeviceDriver {
     // MARK: Compatibility helpers
 
     public func normalizeCommand(_ command: String) -> String {
-        command + profile.returnCharacter
+        command + effectiveReturnCharacter
     }
 
     public func clearBuffer() async throws {

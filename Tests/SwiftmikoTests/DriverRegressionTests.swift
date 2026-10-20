@@ -481,6 +481,37 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertTrue(output.contains("host#"))
     }
 
+    // MARK: - OneAccess ONEOS: sessionPreparation()'s ONEOS6 detection
+    // branch only had a COMMENT describing the needed line-ending switch,
+    // not actual code — real Netmiko mutates self.RETURN = "\n" directly.
+    // BaseConnection.profile is immutable, so this needed a new
+    // returnCharacterOverride/effectiveReturnCharacter mechanism.
+
+    func testOneAccessSwitchesToLineFeedOnlyReturnCharacterWhenOneOS6IsDetected() async throws {
+        let channel = ScriptedChannel(responses: Array(repeating: "router#\n", count: 10))
+        try await channel.open()
+        let connection = OneaccessOneOSSSH(
+            profile: ConnectionProfile(
+                host: "203.0.113.1",
+                deviceType: "oneaccess_oneos",
+                username: "netadmin",
+                auth: .none,
+                returnCharacter: "\r\n"
+            ),
+            channel: channel
+        )
+        XCTAssertEqual(connection.effectiveReturnCharacter, "\r\n")
+
+        // Before the fix, sessionPreparation()'s ONEOS6 branch (no
+        // "error" in the probe response) was just a comment — the
+        // connection kept using its original "\r\n" return character
+        // for every subsequent write, which real ONEOS6 firmware
+        // doesn't expect.
+        try await connection.sessionPreparation()
+
+        XCTAssertEqual(connection.effectiveReturnCharacter, "\n")
+    }
+
     // MARK: - Aviat WTM: sessionPreparation() silently dropped the entire
     // "if allow_auto_change: disable_paging(); commit()" branch real
     // Netmiko has, and the class was also missing NoEnable conformance

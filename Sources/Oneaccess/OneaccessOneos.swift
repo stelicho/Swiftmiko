@@ -94,8 +94,10 @@ open class OneaccessOneOSBase: CiscoBaseConnection {
 
         if output.lowercased().contains("error") {
             try await setTerminalWidth(command: "stty columns 255", cmdVerify: true)
+        } else {
+            // ONEOS6 uses a different line ending.
+            returnCharacterOverride = "\n"
         }
-        // Note: ONEOS6 uses "\n" line endings. Configure profile.returnCharacter = "\n" if needed.
 
         try await testChannelRead(pattern: "[>#]")
         try await setBasePrompt()
