@@ -64,6 +64,19 @@ public final class FlexvnfSSH: BaseConnection, NoEnable {
         try await disablePaging(command: "set screen length 0")
     }
 
+    /// FlexvnfSSH extends BaseConnection directly, whose disablePaging()
+    /// unconditionally throws — this gives it the same real generic
+    /// behavior CiscoBaseConnection-rooted drivers get.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "set screen length 0",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Shell / CLI Mode
 
     /// Detect a root shell prompt and switch into the CLI if
@@ -116,7 +129,7 @@ public final class FlexvnfSSH: BaseConnection, NoEnable {
         checkString: String = "]",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(checkString: checkString)
+        return try await genericIsInConfigMode(checkString: checkString)
     }
 
     /// Maps to netmiko's config_mode(config_command="configure").
@@ -127,7 +140,7 @@ public final class FlexvnfSSH: BaseConnection, NoEnable {
 
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern
         )

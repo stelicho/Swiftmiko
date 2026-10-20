@@ -151,6 +151,29 @@ open class PaloAltoPanosBase: BaseConnection, NoEnable {
         _ = try await testChannelRead(pattern: promptPattern)
     }
 
+    /// PaloAltoPanosBase extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws. Unlike the simpler
+    /// genericDisablePaging() helper (which ignores pattern/cmdVerify,
+    /// matching CiscoBaseConnection's own disablePaging), this forwards
+    /// both explicitly — sessionPreparation()'s FIRST call relies on a
+    /// custom pattern ("...mode on") and cmdVerify:false specifically,
+    /// not just the generic prompt wait.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "set cli pager off",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await sendCommand(
+            command,
+            expectString: pattern,
+            stripPrompt: false,
+            stripCommand: false,
+            cmdVerify: cmdVerify
+        )
+    }
+
     // MARK: Prompt Detection
 
     /// Maps to netmiko's find_prompt() — PA devices can be very slow
@@ -171,7 +194,7 @@ open class PaloAltoPanosBase: BaseConnection, NoEnable {
         checkString: String = "]",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -186,7 +209,7 @@ open class PaloAltoPanosBase: BaseConnection, NoEnable {
 
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern
         )
@@ -199,7 +222,7 @@ open class PaloAltoPanosBase: BaseConnection, NoEnable {
         exitConfig: String = "exit",
         pattern: String = ">"
     ) async throws -> String {
-        return try await super.exitConfigMode(
+        return try await genericExitConfigMode(
             exitConfig: exitConfig,
             pattern: pattern
         )

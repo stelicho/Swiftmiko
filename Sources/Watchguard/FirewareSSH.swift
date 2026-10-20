@@ -28,7 +28,7 @@ public final class WatchguardFirewareSSH: BaseConnection {
         checkString: String = ")#",
         pattern: String = "#"
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -40,7 +40,7 @@ public final class WatchguardFirewareSSH: BaseConnection {
         pattern: String = "#",
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern,
             dotAll: dotAll
@@ -52,7 +52,7 @@ public final class WatchguardFirewareSSH: BaseConnection {
         exitConfig: String = "exit",
         pattern: String = "#"
     ) async throws -> String {
-        return try await super.exitConfigMode(
+        return try await genericExitConfigMode(
             exitConfig: exitConfig,
             pattern: pattern
         )

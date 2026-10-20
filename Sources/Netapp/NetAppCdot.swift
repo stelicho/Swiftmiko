@@ -62,6 +62,21 @@ public final class NetAppCdotSSH: BaseConnection, NoEnable {
         try await disablePaging(command: pagingCommand)
     }
 
+    /// NetAppCdotSSH extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    /// sessionPreparation() always passes its own explicit command, so
+    /// this override's own default is never actually relied upon.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Yes/No Confirmation Helper
 
     /// Send a command via timing-based send, automatically answering
@@ -106,7 +121,7 @@ public final class NetAppCdotSSH: BaseConnection, NoEnable {
         checkString: String = "*>",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -130,7 +145,7 @@ public final class NetAppCdotSSH: BaseConnection, NoEnable {
 
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern
         )
@@ -145,7 +160,7 @@ public final class NetAppCdotSSH: BaseConnection, NoEnable {
         exitConfig: String = "set -privilege admin -confirmations off",
         pattern: String = ""
     ) async throws -> String {
-        return try await super.exitConfigMode(
+        return try await genericExitConfigMode(
             exitConfig: exitConfig,
             pattern: pattern
         )

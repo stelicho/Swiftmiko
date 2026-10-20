@@ -140,7 +140,7 @@ open class TeldatCITBase: BaseConnection, NoEnable {
         checkString: String = "+",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -151,7 +151,7 @@ open class TeldatCITBase: BaseConnection, NoEnable {
         checkString: String = ">",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -162,7 +162,7 @@ open class TeldatCITBase: BaseConnection, NoEnable {
         checkString: String = "$",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -218,7 +218,7 @@ open class TeldatCITBase: BaseConnection, NoEnable {
         dotAll: Bool = false
     ) async throws -> String {
         _ = try await baseMode()
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern
         )

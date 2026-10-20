@@ -89,6 +89,29 @@ open class JuniperBase: BaseConnection, NoEnable {
         try await setBasePrompt()
     }
 
+    /// JuniperBase extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws. sessionPreparation()
+    /// calls this twice with two genuinely different custom commands
+    /// and confirmation patterns (see the "Overloading disable_paging"
+    /// comment above), so this forwards pattern/cmdVerify explicitly
+    /// rather than delegating to the lossy genericDisablePaging()
+    /// helper, which ignores both.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "set cli screen-length 0",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await sendCommand(
+            command,
+            expectString: pattern,
+            stripPrompt: false,
+            stripCommand: false,
+            cmdVerify: cmdVerify
+        )
+    }
+
     // MARK: Shell / CLI Mode Detection
 
     /// Enter the Bourne shell from the JunOS CLI.
@@ -185,7 +208,7 @@ open class JuniperBase: BaseConnection, NoEnable {
         checkString: String = "]",
         pattern: String = "(?m:[>#] $)"
     ) async throws -> Bool {
-        return try await super.isInConfigMode(
+        return try await genericIsInConfigMode(
             checkString: checkString,
             pattern: pattern
         )
@@ -206,7 +229,7 @@ open class JuniperBase: BaseConnection, NoEnable {
         pattern: String = #"(?s:Entering configuration mode.*\].*#)"#,
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(
+        return try await genericEnterConfigMode(
             command: command,
             pattern: pattern
         )

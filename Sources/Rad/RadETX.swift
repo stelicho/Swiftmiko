@@ -27,13 +27,28 @@ open class RadETXBase: BaseConnection {
         try await clearBuffer()
     }
 
+    /// RadETXBase extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    /// sessionPreparation() always passes its own explicit command, so
+    /// this override's own default is never actually relied upon.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "config term length 0",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Config Mode
 
     override public func isInConfigMode(
         checkString: String = ">config",
         pattern: String = ""
     ) async throws -> Bool {
-        return try await super.isInConfigMode(checkString: checkString, pattern: pattern)
+        return try await genericIsInConfigMode(checkString: checkString, pattern: pattern)
     }
 
     @discardableResult
@@ -42,7 +57,7 @@ open class RadETXBase: BaseConnection {
         pattern: String = ">config",
         dotAll: Bool = false
     ) async throws -> String {
-        return try await super.enterConfigMode(command: command, pattern: pattern, dotAll: dotAll)
+        return try await genericEnterConfigMode(command: command, pattern: pattern, dotAll: dotAll)
     }
 
     @discardableResult
@@ -50,7 +65,7 @@ open class RadETXBase: BaseConnection {
         exitConfig: String = "exit all",
         pattern: String = "#"
     ) async throws -> String {
-        return try await super.exitConfigMode(exitConfig: exitConfig, pattern: pattern)
+        return try await genericExitConfigMode(exitConfig: exitConfig, pattern: pattern)
     }
 
 }

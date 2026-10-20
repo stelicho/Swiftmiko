@@ -315,4 +315,95 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("netadmin") })
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("hunter2") })
     }
+
+    // MARK: - BaseConnection-direct drivers missing the config-mode generic helpers
+    //
+    // A second grep pass (for `super.enterConfigMode|super.exitConfigMode|
+    // super.isInConfigMode`) found 10 more BaseConnection-direct drivers with
+    // the same footgun already fixed elsewhere for enable-mode/disablePaging:
+    // calling `super.X()` silently resolves to BaseConnection's stub, not real
+    // wire behavior. 7 of the 10 also had no disablePaging() override at all,
+    // meaning sessionPreparation() couldn't even complete — most notably
+    // Juniper, one of the most widely-used vendors in this entire codebase.
+
+    func testJuniperDisablePagingSendsRealCommandsInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["Screen length set to 0\n>"])
+        try await channel.open()
+        let connection = JuniperSSH(
+            profile: testProfile(deviceType: "juniper_junos"),
+            channel: channel
+        )
+
+        // Before the fix, JuniperBase had no disablePaging() override at
+        // all, so sessionPreparation()'s two calls (for two genuinely
+        // different purposes — see the comment on sessionPreparation())
+        // resolved to BaseConnection's unconditionally-throwing stub,
+        // meaning Juniper devices couldn't even complete session setup.
+        _ = try await connection.disablePaging(
+            command: "set cli screen-length 0",
+            pattern: "Screen length set to"
+        )
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("set cli screen-length 0") })
+    }
+
+    func testJuniperEnterAndIsInConfigModeSendRealCommandsNotSilentNoOps() async throws {
+        let channel = ScriptedChannel(responses: [
+            "Entering configuration mode\n[edit]\nroot@router#",
+            "[edit]#",
+        ])
+        try await channel.open()
+        let connection = JuniperSSH(
+            profile: testProfile(deviceType: "juniper_junos"),
+            channel: channel
+        )
+
+        // Before the fix, both of these silently no-opped (BaseConnection's
+        // enterConfigMode()/isInConfigMode() just flip/read the in-memory
+        // inConfigMode flag — no real command is ever sent) since
+        // JuniperBase extends BaseConnection directly and called
+        // super.enterConfigMode()/super.isInConfigMode().
+        _ = try await connection.enterConfigMode()
+        let inConfig = try await connection.isInConfigMode()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("configure") })
+        XCTAssertTrue(inConfig)
+    }
+
+    func testRadETXDisablePagingSendsConfigTermLengthZeroInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["config term length 0\n#"])
+        try await channel.open()
+        let connection = RadETXSSH(
+            profile: testProfile(deviceType: "rad_etx"),
+            channel: channel
+        )
+
+        // Before the fix, RadETXBase had no disablePaging() override at
+        // all, so sessionPreparation()'s call resolved to BaseConnection's
+        // unconditionally-throwing stub.
+        _ = try await connection.disablePaging()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("config term length 0") })
+    }
+
+    func testWatchguardFirewareEnterAndIsInConfigModeSendRealCommandsNotSilentNoOps() async throws {
+        let channel = ScriptedChannel(responses: [
+            "fireware(config)#",
+            "fireware(config)#",
+        ])
+        try await channel.open()
+        let connection = WatchguardFirewareSSH(
+            profile: testProfile(deviceType: "watchguard_fireware"),
+            channel: channel
+        )
+
+        // Before the fix, both of these silently no-opped since
+        // WatchguardFirewareSSH extends BaseConnection directly and
+        // called super.enterConfigMode()/super.isInConfigMode().
+        _ = try await connection.enterConfigMode()
+        let inConfig = try await connection.isInConfigMode()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("configure") })
+        XCTAssertTrue(inConfig)
+    }
 }
