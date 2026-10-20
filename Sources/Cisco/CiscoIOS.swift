@@ -254,7 +254,9 @@ public final class InLineTransfer: CiscoIOSFileTransfer {
             sourceFile: sourceFile ?? "",
             destinationFile: destinationFile,
             fileSystem: resolvedFileSystem,
-            direction: .put
+            direction: .put,
+            virtualSourceContent: sourceConfig,
+            sourceMD5AddsTrailingNewline: true
         )
     }
 

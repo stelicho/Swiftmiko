@@ -157,7 +157,22 @@ open class SCPHandler {
         progress: SCPProgressCallback? = nil,
         progress4: SCPProgressCallback? = nil,
         hashSupported: Bool = true,
-        scpClient: SCPClient? = nil
+        scpClient: SCPClient? = nil,
+        // The two parameters below exist only for InLineTransfer (Cisco
+        // IOS's TCL-based "puts" transfer), which doesn't move a real
+        // file over SCP at all:
+        //   - virtualSourceContent lets a .put source be raw in-memory
+        //     text (netmiko's source_config) instead of an on-disk
+        //     file, skipping the FileManager existence/size/MD5 checks
+        //     that only make sense for a real path.
+        //   - sourceMD5AddsTrailingNewline matches netmiko's
+        //     file_md5()/config_md5() overrides, which always hash
+        //     content with an extra trailing "\n" appended — Cisco IOS
+        //     automatically adds that newline when writing via `puts`,
+        //     so the locally-computed hash has to account for it too
+        //     or compareMD5()/verify() always reports a mismatch.
+        virtualSourceContent: String? = nil,
+        sourceMD5AddsTrailingNewline: Bool = false
     ) async throws {
         self.connection = connection
         self.sourceFile = sourceFile
@@ -187,17 +202,27 @@ open class SCPHandler {
 
         switch direction {
         case .put:
-            guard FileManager.default.fileExists(atPath: sourceFile) else {
-                throw SwiftmikoError.connectionFailed(
-                    "Local source file does not exist: \(sourceFile)"
-                )
-            }
-            self.fileSize = try Self.localFileSize(atPath: sourceFile)
-            if hashSupported {
-                self.sourceMD5 = try Self.fileMD5(
-                    fileName: sourceFile,
-                    addNewline: false
-                )
+            if let virtualSourceContent {
+                self.fileSize = virtualSourceContent.utf8.count
+                if hashSupported {
+                    self.sourceMD5 = try Self.stringMD5(
+                        virtualSourceContent,
+                        addNewline: sourceMD5AddsTrailingNewline
+                    )
+                }
+            } else {
+                guard FileManager.default.fileExists(atPath: sourceFile) else {
+                    throw SwiftmikoError.connectionFailed(
+                        "Local source file does not exist: \(sourceFile)"
+                    )
+                }
+                self.fileSize = try Self.localFileSize(atPath: sourceFile)
+                if hashSupported {
+                    self.sourceMD5 = try Self.fileMD5(
+                        fileName: sourceFile,
+                        addNewline: sourceMD5AddsTrailingNewline
+                    )
+                }
             }
 
         case .get:
@@ -523,7 +548,23 @@ open class SCPHandler {
         if addNewline {
             data.append(contentsOf: [0x0A])
         }
+        return try md5Hex(of: data)
+    }
 
+    /// Same as fileMD5(fileName:addNewline:), but for in-memory content
+    /// that was never written to disk (InLineTransfer's source_config).
+    public static func stringMD5(
+        _ content: String,
+        addNewline: Bool = false
+    ) throws -> String {
+        var data = Data(content.utf8)
+        if addNewline {
+            data.append(contentsOf: [0x0A])
+        }
+        return try md5Hex(of: data)
+    }
+
+    private static func md5Hex(of data: Data) throws -> String {
 #if canImport(CryptoKit) || canImport(Crypto)
         return Insecure.MD5.hash(data: data)
             .map { String(format: "%02x", $0) }

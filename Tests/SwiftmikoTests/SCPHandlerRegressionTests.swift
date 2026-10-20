@@ -203,4 +203,48 @@ final class SCPHandlerRegressionTests: XCTestCase {
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("bash") })
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("exit") })
     }
+
+    // MARK: - InLineTransfer: sourceConfig-only construction always threw,
+    // and sourceMD5 never accounted for the trailing newline Cisco IOS
+    // automatically appends when writing via TCL's `puts`.
+
+    func testInLineTransferSourceConfigOnlyConstructionDoesNotThrow() async throws {
+        let channel = BufferedChannel()
+        let connection = CiscoIOSSSH(profile: testProfile(deviceType: "cisco_ios"), channel: channel)
+
+        // Before the fix, passing sourceConfig with no sourceFile still
+        // forwarded an empty-string sourceFile down to SCPHandler's
+        // init, which always does a FileManager existence check for
+        // any .put transfer — an empty path never exists, so this
+        // threw unconditionally.
+        let transfer = try await InLineTransfer(
+            connection: connection,
+            sourceConfig: "hostname test-router\n",
+            destinationFile: "test.cfg",
+            fileSystem: "flash:"
+        )
+
+        XCTAssertEqual(transfer.fileSize, "hostname test-router\n".utf8.count)
+    }
+
+    func testInLineTransferSourceMD5IncludesCiscosAutomaticTrailingNewline() async throws {
+        let channel = BufferedChannel()
+        let connection = CiscoIOSSSH(profile: testProfile(deviceType: "cisco_ios"), channel: channel)
+
+        let config = "hostname test-router"
+        let transfer = try await InLineTransfer(
+            connection: connection,
+            sourceConfig: config,
+            destinationFile: "test.cfg",
+            fileSystem: "flash:"
+        )
+
+        // Before the fix, sourceMD5 was computed from the raw content
+        // with no adjustment — but Cisco IOS's `puts` always appends a
+        // trailing newline to whatever gets written to flash, so the
+        // REMOTE file's real MD5 would never match this value.
+        let expectedMD5 = try SCPHandler.stringMD5(config, addNewline: true)
+        XCTAssertEqual(transfer.sourceMD5, expectedMD5)
+        XCTAssertNotEqual(transfer.sourceMD5, try SCPHandler.stringMD5(config, addNewline: false))
+    }
 }
