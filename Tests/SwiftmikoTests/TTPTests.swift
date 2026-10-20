@@ -166,6 +166,47 @@ final class TTPTests: XCTestCase {
         }
     }
 
+    // MARK: - Variable-name grammar (confirmed looser than identifier-style
+    // against the real installed `ttp` package: digit-first names, hyphens,
+    // and dots are all accepted verbatim; only empty names or internal
+    // whitespace actually fail)
+
+    func testDottedVariableNameIsAcceptedAndUsedVerbatimAsTheOutputKey() throws {
+        let template = try TTPTemplate(templateString: "interface {{ interface.name }}")
+        let rows = TTPExecution.parse(template: template, rawText: "interface Gi1/0/1")
+        XCTAssertEqual(rows.first?["interface.name"] as? String, "Gi1/0/1")
+    }
+
+    func testDigitFirstVariableNameIsAccepted() throws {
+        let template = try TTPTemplate(templateString: "interface {{ 1abc }}")
+        let rows = TTPExecution.parse(template: template, rawText: "interface Gi1/0/1")
+        XCTAssertEqual(rows.first?["1abc"] as? String, "Gi1/0/1")
+    }
+
+    func testHyphenatedVariableNameIsAccepted() throws {
+        let template = try TTPTemplate(templateString: "interface {{ a-b }}")
+        let rows = TTPExecution.parse(template: template, rawText: "interface Gi1/0/1")
+        XCTAssertEqual(rows.first?["a-b"] as? String, "Gi1/0/1")
+    }
+
+    func testEmptyVariableNameIsStillRejected() {
+        XCTAssertThrowsError(try TTPTemplate(templateString: "interface {{ }}")) { error in
+            guard case TTPParsingError.malformedVariableToken = error else {
+                XCTFail("expected malformedVariableToken, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testVariableNameWithInternalWhitespaceIsStillRejected() {
+        XCTAssertThrowsError(try TTPTemplate(templateString: "interface {{ a b }}")) { error in
+            guard case TTPParsingError.malformedVariableToken = error else {
+                XCTFail("expected malformedVariableToken, got \(error)")
+                return
+            }
+        }
+    }
+
     func testUnsupportedFormatterThrows() {
         XCTAssertThrowsError(try TTPTemplate(templateString: "{{ x | UPPER }}")) { error in
             guard case TTPParsingError.unsupportedFormatter("UPPER") = error else {

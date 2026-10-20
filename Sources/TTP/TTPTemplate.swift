@@ -129,8 +129,18 @@ public final class TTPTemplate {
             let token = remainder[openRange.upperBound..<closeRange.lowerBound]
                 .trimmingCharacters(in: .whitespaces)
             let parts = token.split(separator: "|", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            // Real ttp's variable-name grammar is far looser than a
+            // Swift/Python identifier: confirmed empirically (installed
+            // `ttp` package) that digit-first names ("1abc"), hyphens
+            // ("a-b"), and dots ("a.b.c", even leading/trailing dots) are
+            // all accepted verbatim as the literal output key — only an
+            // empty name or internal whitespace actually fails. The
+            // sanitize/remap machinery below already handles embedding an
+            // arbitrary name into a regex named group and recovering it
+            // afterward, so there's no reason to be stricter than real ttp
+            // actually is here.
             guard let varName = parts.first, !varName.isEmpty,
-                  varName.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil else {
+                  varName.range(of: "\\s", options: .regularExpression) == nil else {
                 throw TTPParsingError.malformedVariableToken(token)
             }
             let formatterPattern = try TTPFormatter.pattern(for: parts.count > 1 ? parts[1] : nil)
