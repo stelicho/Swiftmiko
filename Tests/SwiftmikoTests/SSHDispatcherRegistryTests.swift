@@ -42,6 +42,51 @@ final class SSHDispatcherRegistryTests: XCTestCase {
         }
     }
 
+    // MARK: - Dedicated Cisco drivers must be routed to their own class
+    //
+    // Six device-type families (cisco_xe, cisco_nxos, cisco_asa,
+    // cisco_viptela, cisco_wlc, cisco_xr) were all wired to construct
+    // the generic CiscoSSHConnection even though dedicated driver
+    // classes already existed for each — silently nullifying any
+    // fixes made to those dedicated classes (confirmed for
+    // CiscoWlcSSH's disablePaging fix, which was unreachable through
+    // this dispatcher despite being correct in isolation).
+
+    func testDedicatedCiscoDriversAreRoutedToTheirOwnClassNotGenericCiscoSSHConnection() {
+        let expectations: [(deviceType: String, typeName: String)] = [
+            ("cisco_xe", "CiscoIOSSSH"),
+            ("cisco_xe_ssh", "CiscoIOSSSH"),
+            ("cisco_xe_telnet", "CiscoIOSTelnet"),
+            ("cisco_nxos", "CiscoNXOSSSH"),
+            ("cisco_nxos_ssh", "CiscoNXOSSSH"),
+            ("cisco_nxos_telnet", "CiscoNXOSTelnet"),
+            ("cisco_asa", "CiscoASASSH"),
+            ("cisco_asa_ssh", "CiscoASASSH"),
+            ("cisco_viptela", "CiscoViptelaSSH"),
+            ("cisco_viptela_ssh", "CiscoViptelaSSH"),
+            ("cisco_wlc", "CiscoWlcSSH"),
+            ("cisco_wlc_ssh", "CiscoWlcSSH"),
+            ("cisco_xr", "CiscoXrBase"),
+            ("cisco_xr_ssh", "CiscoXrBase"),
+            ("cisco_xr_telnet", "CiscoXrBase"),
+        ]
+        for (deviceType, typeName) in expectations {
+            let profile = ConnectionProfile(
+                host: "203.0.113.1",
+                deviceType: deviceType,
+                username: "netadmin",
+                auth: .none
+            )
+            let factory = SSHDispatcher.defaultConnectionFactories[deviceType]
+            let connection = factory?(profile)
+            XCTAssertNotNil(connection, "Factory for \(deviceType) returned nil")
+            XCTAssertEqual(
+                String(describing: type(of: connection!)), typeName,
+                "\(deviceType) built \(String(describing: type(of: connection!))) instead of \(typeName)"
+            )
+        }
+    }
+
     // MARK: - connectHandler's channel-selection routing
     //
     // These mirror SerialChannelTests' equivalent check for the "_serial"
