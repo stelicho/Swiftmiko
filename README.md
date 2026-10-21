@@ -115,6 +115,19 @@ down at the transport layer (`Sources/NIOSSHChannel.swift` and the
 vendored `swift-nio-ssh` fork), not just this demo, so it applies to
 any `paloalto_panos` connection using password auth.
 
+Three more each focus on a single transport or feature rather than a
+vendor's CLI quirks:
+[`TelnetDemo`](./Examples/TelnetDemo) connects over plaintext Telnet
+(`cisco_ios_telnet`, port 23) instead of SSH;
+[`SCPDemo`](./Examples/SCPDemo) puts and gets files against a Cisco IOS
+device via the `fileTransfer()` helper, showing the
+exists/transferred/verified result of each attempt;
+[`SNMPDemo`](./Examples/SNMPDemo) pairs `SNMPDetect.autodetect()` with a
+minimal real SNMP v1/v2c GET transport written for the demo (the
+library itself only ships the autodetection logic, not a wire client —
+see `SNMPTransport` in `Sources/SNMPAutodetect.swift`) to identify a
+device from its `sysDescr`.
+
 [`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
 one out — a browser-based sibling of `CommandRunnerDemo` built with
 [Vapor](https://vapor.codes) instead of SwiftUI. It's a standalone

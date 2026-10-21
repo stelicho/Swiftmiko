@@ -631,6 +631,9 @@ await connection.disconnect()
 implementation supplied to actually talk SNMP on the wire — Swiftmiko
 doesn't bundle one, matching Netmiko's own dependency on the external
 `pysnmp` package for this feature.
+[`Examples/SNMPDemo`](./Examples/SNMPDemo) has a minimal real SNMP
+v1/v2c GET-only transport (`MinimalSNMPGetTransport.swift`) written to
+satisfy this protocol, if you need a starting point.
 
 <br />
 
