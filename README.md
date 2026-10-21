@@ -10,8 +10,8 @@
   <a href="https://github.com/stelicho/Swiftmiko/actions/workflows/ci.yml">
     <img src="https://github.com/stelicho/Swiftmiko/actions/workflows/ci.yml/badge.svg" alt="CI status">
   </a>
-  <a href="https://github.com/stelicho/Swiftmiko/blob/main/Package.swift">
-    <img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.9+">
+  <a href="#requirements">
+    <img src="https://img.shields.io/badge/Swift-6.1%2B-F05138?logo=swift&logoColor=white" alt="Swift 6.1+">
   </a>
   <a href="https://github.com/stelicho/Swiftmiko/actions/workflows/ci.yml">
     <img src="https://img.shields.io/badge/Platforms-macOS%2014%2B%20%7C%20iOS%2016%2B%20%7C%20Linux%20%7C%20Windows-blue" alt="Platforms: macOS 14+, iOS 16+, Linux, Windows">
