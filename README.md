@@ -106,6 +106,12 @@ SR Linux (`nokia_srl`) — handy for testing against a containerlab/SR
 Linux Docker image. Note this targets a different platform than
 `NokiaDemo` below, which is SR OS, not SR Linux — the two Nokia
 drivers don't share a CLI or a config model.
+[`MultiVendorDemoPad`](./Examples/MultiVendorDemoPad) is the iPhone/
+iPad sibling of the multi-vendor command runner — same platform
+picker and command set, but with the connection form and platform
+choice behind a toolbar-triggered sheet (`ConnectSheet.swift`) instead
+of always-visible fields, since the macOS layout doesn't fit a phone
+screen.
 Each is its own Xcode target; open `Swiftmiko.xcworkspace` (or the
 project directly) and switch schemes to try one.
 
