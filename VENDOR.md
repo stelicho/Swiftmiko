@@ -128,9 +128,17 @@ final class AristaTests: XCTestCase {
 }
 ```
 
-See [`TESTING.md`](./TESTING.md) for the full test-suite layout and
-how to test against real/emulated hardware once you have a lab
-device available.
+If the vendor's session preparation, enable mode, or config mode is a
+multi-step exchange (the driver reads the channel more than once),
+use `ScriptedChannel` (`Tests/SwiftmikoTests/ScriptedChannel.swift`)
+instead of `BufferedChannel` — it returns one scripted response per
+read, in order, so you can script out the exact back-and-forth rather
+than dumping everything in at once.
+
+See [`TESTING.md`](./TESTING.md) for the full test-suite layout, how
+to confirm a new test actually catches the bug it's meant to, and how
+to test against real/emulated hardware once you have a lab device
+available.
 
 ## 6. Document any translation quirks inline
 

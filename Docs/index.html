@@ -98,8 +98,9 @@ await connection.disconnect()</code></pre>
 
         <h2 id="requirements">Requirements at a glance</h2>
         <ul>
-            <li>Xcode 16+ / Swift 5.9+</li>
-            <li>macOS 14+ or iOS 16+ (library target)</li>
+            <li>Swift 6.1+ (swift-nio / swift-crypto's manifests require it)</li>
+            <li>macOS 14+, iOS 16+, iPadOS 16+, Linux, or Windows (library target)</li>
+            <li>Xcode 16+ if you're on an Apple platform, or building the SwiftUI <code>Examples/</code> apps</li>
             <li>Swift Package Manager</li>
         </ul>
 
