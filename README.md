@@ -91,7 +91,12 @@ The `Examples/` directory contains several small SwiftUI apps
 demonstrating real usage against real devices — a VLAN viewer, an
 enable-mode demo, a running-config fetcher, a multi-vendor command
 runner, a generic Linux SSH demo, a Ubiquiti command runner (UniFi
-Switch, EdgeSwitch, EdgeRouter), and an Open vSwitch topology browser.
+Switch, EdgeSwitch, EdgeRouter), an Open vSwitch topology browser, and
+[`NokiaSrlDemo`](./Examples/NokiaSrlDemo), a command runner for Nokia
+SR Linux (`nokia_srl`) — handy for testing against a containerlab/SR
+Linux Docker image. Note this targets a different platform than
+`NokiaDemo` below, which is SR OS, not SR Linux — the two Nokia
+drivers don't share a CLI or a config model.
 Each is its own Xcode target; open `Swiftmiko.xcworkspace` (or the
 project directly) and switch schemes to try one.
 

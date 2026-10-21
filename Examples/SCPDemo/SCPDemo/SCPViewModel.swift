@@ -18,6 +18,11 @@ final class SCPViewModel {
     var enableSCPFirst = false
     var overwriteExisting = false
 
+    /// Off by default. AES-CBC is a real security downgrade (known
+    /// plaintext-recovery weaknesses) — only turn this on for lab/EOL
+    /// gear you control that has no AES-GCM support.
+    var allowLegacyCiphers = false
+
     var result: FileTransferResult?
     var isRunning = false
     var errorMessage: String?
@@ -59,7 +64,8 @@ final class SCPViewModel {
                 deviceType: "cisco_ios",
                 username: username,
                 auth: .password(password),
-                secret: secret.isEmpty ? nil : secret
+                secret: secret.isEmpty ? nil : secret,
+                allowLegacyCiphers: allowLegacyCiphers
             )
             let connection = try await SSHDispatcher.connectHandler(profile: profile)
             defer { Task { await connection.disconnect() } }

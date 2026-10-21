@@ -35,6 +35,10 @@ struct ContentView: View {
                 Toggle("Enable \"ip scp server enable\" first", isOn: $viewModel.enableSCPFirst)
                     .help("Cisco IOS refuses SCP sessions until this is configured — check this if you haven't already set it up on the device.")
                     .padding(.horizontal, 4)
+
+                Toggle("Allow legacy AES-CBC ciphers", isOn: $viewModel.allowLegacyCiphers)
+                    .help("Only enable this for old IOS images that don't support AES-GCM. AES-CBC is a known-weaker cipher — use it only against lab/EOL gear you control.")
+                    .padding(.horizontal, 4)
             }
 
             GroupBox("Transfer") {
