@@ -36,11 +36,17 @@ public final class UbiquitiUnifiSwitchSSH: UbiquitiEdgeSSH {
     }
 
     override public func cleanup(command: String = "exit") async throws {
-        if try await isInConfigMode() {
-            _ = try? await exitConfigMode()
+        do {
+            if try await isInConfigMode() {
+                _ = try await exitConfigMode()
+            }
+            // Exit from the telnet localhost session
+            try await writeChannel(command + profile.returnCharacter)
+        } catch {
+            // Best-effort — matches real Netmiko's own try/except pass
+            // around this entire block; super.cleanup() must always
+            // run regardless of what happens here.
         }
-        // Exit from the telnet localhost session
-        try await writeChannel(command + profile.returnCharacter)
         try await super.cleanup(command: command)
     }
 }

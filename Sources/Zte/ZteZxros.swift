@@ -164,9 +164,9 @@ public final class ZteZxrosTelnet: ZteZxrosBase {
     /// is a Telnet instance and registers _process_option before
     /// delegating to the base implementation.
     override public func telnetLogin(
-        primaryTerminator: String = "#",
-        altTerminator: String = ">",
-        usernamePattern: String = "(?:username|login)",
+        primaryTerminator: String = #"(?m)#\s*$"#,
+        altTerminator: String = #"(?m)>\s*$"#,
+        usernamePattern: String = "(?:user:|username|login|user name)",
         passwordPattern: String = "assword",
         delay: TimeInterval = 1.0,
         maxLoops: Int = 20

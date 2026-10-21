@@ -671,4 +671,164 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("session paginate false") })
         XCTAssertTrue(channel.writes.contains { $0.hasPrefix("commit") })
     }
+
+    // MARK: - TP-Link JetStream: init was missing setGlobalCmdVerify(false)
+    // entirely, despite the class's own doc comment claiming it was
+    // needed (TP-Link has no way to set terminal width, which breaks
+    // command-echo verification).
+
+    func testTPLinkJetStreamForcesGlobalCmdVerifyOffAndCarriageReturnLineFeedAtInit() {
+        let profile = ConnectionProfile(
+            host: "203.0.113.1",
+            deviceType: "tplink_jetstream",
+            username: "netadmin",
+            auth: .none,
+            returnCharacter: ""
+        )
+        let connection = TPLinkJetStreamSSH(profile: profile)
+
+        // Before the fix, cmdVerifyEnabled was left at its default
+        // (true), which would falsely fail every command-echo check
+        // on a platform that can't widen its terminal.
+        XCTAssertFalse(connection.cmdVerifyEnabled)
+        XCTAssertEqual(connection.profile.returnCharacter, "\r\n")
+    }
+
+    // MARK: - UbiquitiEdgeRouterSSH: sessionPreparation() used VyOS's
+    // "set terminal width/length" command text instead of EdgeRouter's
+    // own "terminal width/length" (no "set " prefix); saveConfig()
+    // incorrectly wrapped the "save" command in enterConfigMode()/
+    // exitConfigMode(), which real Netmiko's UbiquitiEdgeRouterSSH does
+    // NOT do (only VyOSSSH itself wraps save_config with config mode).
+
+    func testEdgeRouterSessionPreparationSendsBareTerminalCommandsNotVyOSSetPrefixedOnes() async throws {
+        // Every distinct read in sessionPreparation() (testChannelRead,
+        // findPrompt, setTerminalWidth's pattern wait, disablePaging's
+        // read, clearBuffer's drain) only needs the SAME matching
+        // string as its next unconsumed response — repeating one
+        // response containing both "terminal" and a trailing ">"
+        // sidesteps having to predict exactly how many reads each step
+        // consumes.
+        let channel = ScriptedChannel(responses: Array(repeating: "terminal edgerouter>\n", count: 60))
+        try await channel.open()
+        let connection = UbiquitiEdgeRouterSSH(
+            profile: testProfile(deviceType: "ubiquiti_edgerouter"),
+            channel: channel
+        )
+
+        try await connection.sessionPreparation()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("terminal width 512") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("terminal length 0") })
+        XCTAssertFalse(channel.writes.contains { $0.hasPrefix("set terminal") })
+    }
+
+    func testEdgeRouterSaveConfigDoesNotEnterConfigModeFirst() async throws {
+        let channel = ScriptedChannel(responses: ["save\nDone\nedgerouter>"])
+        try await channel.open()
+        let connection = UbiquitiEdgeRouterSSH(
+            profile: testProfile(deviceType: "ubiquiti_edgerouter"),
+            channel: channel
+        )
+
+        // Before the fix, this wrapped the "save" command with
+        // enterConfigMode()/exitConfigMode() (VyOSSSH's own behavior) —
+        // real Netmiko's EdgeRouter override sends "save" directly at
+        // the normal CLI prompt instead.
+        _ = try await connection.saveConfig()
+
+        XCTAssertFalse(channel.writes.contains { $0.hasPrefix("configure") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("save") })
+    }
+
+    // MARK: - UbiquitiUnifiSwitchSSH: cleanup() only wrapped
+    // exitConfigMode() in a best-effort try? — if isInConfigMode()
+    // itself threw, the whole method threw and neither the final
+    // "exit" write nor super.cleanup() ever ran. Real Netmiko wraps
+    // the entire block in try/except pass specifically so
+    // super().cleanup() always executes.
+
+    func testUnifiSwitchCleanupIsBestEffortAndAlwaysReachesSuperCleanup() async throws {
+        let channel = ThrowsOnceOnReadChannel()
+        try await channel.open()
+        let connection = UbiquitiUnifiSwitchSSH(
+            profile: testProfile(deviceType: "ubiquiti_unifiswitch"),
+            channel: channel
+        )
+
+        // isInConfigMode() calls findPrompt(), which reads the channel —
+        // this double throws on that very first read, simulating a
+        // transient failure during the config-mode probe. Before the
+        // fix, that throw propagated straight out of cleanup() entirely
+        // — this call would have thrown instead of returning normally,
+        // and super.cleanup()'s own "exit" write would never happen.
+        try await connection.cleanup()
+
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("exit") })
+    }
+
+    // MARK: - ZteZxrosTelnet: telnetLogin() override re-declared its own
+    // defaults for primaryTerminator/altTerminator/usernamePattern
+    // instead of matching BaseConnection's real ones — real Netmiko's
+    // ZteZxrosTelnet.telnet_login() forwards *args/**kwargs untouched,
+    // so it always uses the base class's own defaults verbatim.
+
+    func testZteZxrosTelnetLoginUsesBaseConnectionsRealUsernamePatternNotANarrowerOverride() async throws {
+        let channel = ScriptedChannel(responses: [
+            "User Name:",  // matches the real default
+                           // "(?:user:|username|login|user name)" but NOT
+                           // the prior buggy override "(?:username|login)"
+            "assword: ",
+            "host#",
+        ])
+        try await channel.open()
+        let connection = ZteZxrosTelnet(
+            profile: testProfile(deviceType: "zte_zxros_telnet", password: "hunter2"),
+            channel: channel
+        )
+
+        _ = try await connection.telnetLogin()
+
+        // Before the fix, the username prompt was never recognized, so
+        // neither the username nor password would ever be sent.
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("netadmin") })
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("hunter2") })
+    }
+}
+
+/// A Channel whose very first readAvailable() call throws, then
+/// behaves as an ordinary empty channel afterward — used to simulate a
+/// transient read failure partway through a multi-step method (e.g.
+/// cleanup()'s isInConfigMode() probe) without the whole channel being
+/// unusable for the writes that follow.
+final class ThrowsOnceOnReadChannel: Channel, @unchecked Sendable {
+    private(set) var isOpen = false
+    private(set) var writes: [String] = []
+    private var hasThrown = false
+
+    func open() async throws { isOpen = true }
+    func authenticate(username: String, using method: AuthMethod) async throws {}
+    func write(_ data: String) async throws { writes.append(data) }
+    func readAvailable() async throws -> String {
+        guard hasThrown else {
+            hasThrown = true
+            throw SwiftmikoError.timeout("simulated transient read failure")
+        }
+        return ""
+    }
+    func close() async { isOpen = false }
+}
+
+// ScriptedChannel already satisfies TelnetSocket's close() signature;
+// the remaining TelnetNegotiatingChannel requirements are no-ops here
+// since this particular regression test only exercises telnetLogin()'s
+// username/password pattern matching, not IAC option negotiation.
+extension ScriptedChannel: TelnetNegotiatingChannel {
+    func write(_ data: Data) async throws {}
+    func read(maxLength: Int) async throws -> Data { Data() }
+    func sendRawOption(command: UInt8, option: UInt8) async throws {}
+    func sendSubnegotiation(option: UInt8, payload: [UInt8]) async throws {}
+    func setOptionNegotiationCallback(
+        _ callback: @escaping @Sendable (UInt8, UInt8) async throws -> Void
+    ) async {}
 }

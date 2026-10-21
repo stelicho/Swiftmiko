@@ -44,6 +44,7 @@ struct NoEnableEnforcementTests {
             DigiTransportSSH(profile: testProfile(deviceType: "digi_transport")),
             AviatWTMSSH(profile: testProfile(deviceType: "aviat_wtm")),
             BintecBossSSH(profile: testProfile(deviceType: "bintec_boss")),
+            VertivMPHBase(profile: testProfile(deviceType: "vertiv_mph")),
         ]
         for connection in classes {
             // BaseConnection's own default enterEnableMode() throws

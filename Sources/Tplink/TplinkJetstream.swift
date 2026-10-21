@@ -30,7 +30,7 @@ open class TPLinkJetStreamBase: CiscoSSHConnection {
         channelProvider: ChannelProvider? = nil
     ) {
         var adjusted = profile
-        if adjusted.returnCharacter == "\n" {
+        if adjusted.returnCharacter.isEmpty || adjusted.returnCharacter == "\n" {
             adjusted.returnCharacter = "\r\n"
         }
         super.init(
@@ -40,6 +40,11 @@ open class TPLinkJetStreamBase: CiscoSSHConnection {
             channel: channel,
             channelProvider: channelProvider
         )
+        // TP-Link has no way to set terminal width, which breaks
+        // command-echo verification — real Netmiko forces
+        // global_cmd_verify off unless the caller's profile already
+        // specifies it.
+        setGlobalCmdVerify(false)
     }
 
     // MARK: Session Preparation

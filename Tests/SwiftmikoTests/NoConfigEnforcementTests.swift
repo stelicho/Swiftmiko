@@ -43,6 +43,7 @@ struct NoConfigEnforcementTests {
             SophosSfosSSH(profile: testProfile(deviceType: "sophos_sfos")),
             DigiTransportSSH(profile: testProfile(deviceType: "digi_transport")),
             BintecBossSSH(profile: testProfile(deviceType: "bintec_boss")),
+            VertivMPHBase(profile: testProfile(deviceType: "vertiv_mph")),
         ]
         for connection in classes {
             #expect(try await connection.isInConfigMode() == true)
