@@ -157,9 +157,15 @@ then open `http://localhost:8080`. See its own README for details.
 [`CommandRunnerTerminalDemo`](./Examples/CommandRunnerTerminalDemo) is
 another standalone package, not an Xcode project — a plain terminal
 version of the same idea with no SwiftUI and no web framework, just
-`Foundation` and `Swiftmiko`. It's the one example in this directory
-that actually builds and runs on Linux and Windows too, not just
-macOS — CI builds it on all three.
+`Foundation` and `Swiftmiko`. It builds and runs on Linux and Windows
+too, not just macOS — CI builds it on all three.
+
+[`ScriptDemo`](./Examples/ScriptDemo) is the non-interactive
+counterpart: a flag-driven script (`--host`/`--username`/`--command`/
+`--allow-legacy-ciphers`, no YAML inventory file, no REPL) targeting
+Cisco IOS, proof that Swiftmiko scripts the way Netmiko does — closer
+to something you'd drop into a cron job or CI pipeline than a prompt
+you sit and type into. Also a standalone package, also cross-platform.
 
 [`CLIToolsDemo`](./Examples/CLIToolsDemo) isn't an app at all — it's a
 walkthrough and sample inventory file for the command-line tools
