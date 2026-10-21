@@ -62,6 +62,21 @@ open class IIJSeilosBase: BaseConnection, NoEnable, NoConfig {
         NoEnableBehavior.exit()
     }
 
+    /// IIJSeilosBase extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    /// sessionPreparation() always passes its own explicit command, so
+    /// this override's own default is never actually relied upon.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "environment pager off",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's session_preparation().

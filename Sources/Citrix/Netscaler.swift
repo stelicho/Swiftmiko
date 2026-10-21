@@ -40,6 +40,30 @@ public final class NetscalerSSH: BaseConnection, NoConfig {
         NoConfigBehavior.exit()
     }
 
+    /// NetscalerSSH extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    /// Unlike every other disablePaging command in this vendor set,
+    /// sessionPreparation()'s own command embeds profile.returnCharacter
+    /// on BOTH sides already — genericDisablePaging()'s sendCommand()
+    /// call appends its own trailing return unconditionally, which
+    /// would double it up. Real Netmiko's normalize_cmd() strips
+    /// trailing whitespace before adding exactly one return, so this
+    /// mirrors that explicitly rather than delegating to the lossy
+    /// generic helper.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        let trimmedCommand = command.replacingOccurrences(
+            of: #"\s+$"#, with: "", options: .regularExpression
+        )
+        return try await sendCommand(trimmedCommand, stripPrompt: false, stripCommand: false)
+    }
+
     // MARK: Session Preparation
 
     /// Maps to netmiko's:

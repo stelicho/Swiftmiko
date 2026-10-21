@@ -65,6 +65,21 @@ public final class JuniperScreenOsSSH: BaseConnection, NoEnable, NoConfig {
         NoEnableBehavior.exit()
     }
 
+    /// JuniperScreenOsSSH extends BaseConnection directly, whose
+    /// disablePaging() unconditionally throws — this gives it the same
+    /// real generic behavior CiscoBaseConnection-rooted drivers get.
+    /// sessionPreparation() always passes its own explicit command, so
+    /// this override's own default is never actually relied upon.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "set console page 0",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     // MARK: Session Preparation
 
     /// Handle ScreenOS's optional terms-acceptance prompt, then

@@ -27,6 +27,27 @@ import Foundation
 /// trusting this driver to connect cleanly out of the box.
 public final class SmartOpticsDWDMSSH: BaseConnection {
 
+    /// Real Netmiko has no explicit disablePaging() or
+    /// sessionPreparation() override for this driver either — it
+    /// relies ENTIRELY on BaseConnection's own default
+    /// session_preparation() and disable_paging(), which in real
+    /// Netmiko is a genuine, working generic implementation (write
+    /// "terminal length 0", read the echo, read until prompt) rather
+    /// than a throw. Swiftmiko's BaseConnection.disablePaging()
+    /// deliberately throws by default instead (an ambiguous device
+    /// hasn't decided how to disable paging), so this override exists
+    /// purely to restore the real generic behavior this driver was
+    /// always meant to inherit.
+    @discardableResult
+    override public func disablePaging(
+        command: String = "terminal length 0",
+        delay: TimeInterval = 0.5,
+        cmdVerify: Bool = true,
+        pattern: String? = nil
+    ) async throws -> String {
+        try await genericDisablePaging(command: command)
+    }
+
     /// Maps to netmiko's set_base_prompt(), forwarded to the base
     /// implementation with no behavioral change — this override
     /// exists in the Python source only to make the terminator

@@ -546,6 +546,99 @@ final class DriverRegressionTests: XCTestCase {
         XCTAssertEqual(connection.profile.returnCharacter, "\r\n")
     }
 
+    // MARK: - Nine more BaseConnection-direct drivers missing a
+    // disablePaging() override entirely (found by reading files directly
+    // rather than grepping for "super.disablePaging", since these never
+    // called super at all — they just never overrode it). Every one of
+    // these previously could not complete sessionPreparation().
+
+    func testCalixExaDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["disable session pager\n>"])
+        try await channel.open()
+        let connection = CalixExaSSH(profile: testProfile(deviceType: "calix_exa"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("disable session pager") })
+    }
+
+    func testCheckPointGaiaDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["set clienv rows 0\n#"])
+        try await channel.open()
+        let connection = CheckPointGaiaSSH(profile: testProfile(deviceType: "checkpoint_gaia"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("set clienv rows 0") })
+    }
+
+    func testCienaSaosDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["system shell session set more off\n>"])
+        try await channel.open()
+        let connection = CienaSaosSSH(profile: testProfile(deviceType: "ciena_saos"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("system shell session set more off") })
+    }
+
+    func testCienaSaos10DisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["set session more off\n>"])
+        try await channel.open()
+        let connection = CienaSaos10SSH(profile: testProfile(deviceType: "ciena_saos10"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("set session more off") })
+    }
+
+    func testF5TmshDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: [
+            "modify cli preference pager disabled display-threshold 0\n#"
+        ])
+        try await channel.open()
+        let connection = F5TmshSSH(profile: testProfile(deviceType: "f5_tmsh"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(
+            channel.writes.contains { $0.hasPrefix("modify cli preference pager disabled display-threshold 0") }
+        )
+    }
+
+    func testIijSeilosDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["environment pager off\n#"])
+        try await channel.open()
+        let connection = IIJSeilosSSH(profile: testProfile(deviceType: "iij_seilos"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("environment pager off") })
+    }
+
+    func testJuniperScreenOsDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["set console page 0\n->"])
+        try await channel.open()
+        let connection = JuniperScreenOsSSH(profile: testProfile(deviceType: "juniper_screenos"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("set console page 0") })
+    }
+
+    func testNetscalerDisablePagingSendsRealCommandWithoutDoublingTheTrailingReturn() async throws {
+        let channel = ScriptedChannel(responses: ["\nset cli mode -page OFF\n>"])
+        try await channel.open()
+        let connection = NetscalerSSH(profile: testProfile(deviceType: "netscaler"), channel: channel)
+
+        let pagingCommand = "\n" + "set cli mode -page OFF" + "\n"
+        _ = try await connection.disablePaging(command: pagingCommand)
+
+        // Before the fix, this threw unconditionally. The write itself
+        // must also not double the trailing return the command already
+        // embeds — real Netmiko's normalize_cmd() strips trailing
+        // whitespace before adding exactly one.
+        guard let write = channel.writes.first else {
+            XCTFail("Expected a write")
+            return
+        }
+        XCTAssertEqual(write, "\nset cli mode -page OFF\n")
+    }
+
+    func testSmartOpticsDWDMDisablePagingSendsRealCommandInsteadOfThrowing() async throws {
+        let channel = ScriptedChannel(responses: ["terminal length 0\n#"])
+        try await channel.open()
+        let connection = SmartOpticsDWDMSSH(profile: testProfile(deviceType: "smartoptics_dwdm"), channel: channel)
+        _ = try await connection.disablePaging()
+        XCTAssertTrue(channel.writes.contains { $0.hasPrefix("terminal length 0") })
+    }
+
     // MARK: - Aviat WTM: sessionPreparation() silently dropped the entire
     // "if allow_auto_change: disable_paging(); commit()" branch real
     // Netmiko has, and the class was also missing NoEnable conformance
