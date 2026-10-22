@@ -363,7 +363,7 @@ public final class ZpeNodegridFileTransfer: SCPHandler {
             try await nodegridConnection.returnCLI()
             return try Self.processMD5(output.trimmingCharacters(in: .whitespacesAndNewlines))
         } catch {
-            try? await nodegridConnection.returnCLI()
+            _ = try? await nodegridConnection.returnCLI()
             throw error
         }
     }
