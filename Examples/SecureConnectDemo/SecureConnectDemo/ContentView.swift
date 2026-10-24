@@ -65,7 +65,7 @@ struct ContentView: View {
                                 SecureField("optional", text: $viewModel.keyPassphrase)
                             }
                         }
-                        Text("Ed25519 or ECDSA keys only (OpenSSH/SEC1/PKCS8 PEM) — RSA and passphrase-protected keys throw a clear error. See the README.")
+                        Text("Ed25519, ECDSA, or RSA in OpenSSH format; SEC1/PKCS8 PEM support Ed25519/ECDSA only (RSA in PEM form throws a clear error). Passphrase decryption works for OpenSSH-format keys (ssh-keygen's default); SEC1/PKCS8 must be unencrypted. See the README.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

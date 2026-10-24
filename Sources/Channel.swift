@@ -21,12 +21,13 @@ import Foundation
 public enum AuthMethod: Sendable {
     case password(String)
 
-    /// `passphrase` is accepted here but not currently wired to any
-    /// decryption — every key format `SSHKeyLoader` parses must be
-    /// unencrypted; a passphrase-protected key throws a clear
-    /// "Passphrase-protected SSH keys are not supported" error
-    /// regardless of what (if anything) is passed here. Strip the
-    /// passphrase first: `ssh-keygen -p -N '' -f <keyfile>`.
+    /// `passphrase` decrypts an OpenSSH-format private key encrypted
+    /// with OpenSSH's standard bcrypt-kdf + AES-CTR/CBC scheme (the
+    /// `ssh-keygen` default) — see `BCryptPBKDF.swift` and
+    /// `SSHKeyLoader.swift`. A missing or incorrect passphrase throws a
+    /// clear error rather than silently failing. SEC1/PKCS8 PEM keys
+    /// don't use this parameter — OpenSSH format is the only
+    /// passphrase-encrypted format Swiftmiko can load.
     case keyFile(path: String, passphrase: String? = nil)
 
     /// Not currently implemented — swift-nio-ssh has no SSH-agent

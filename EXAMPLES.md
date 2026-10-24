@@ -409,14 +409,29 @@ await connection.disconnect()
 print(output)
 ```
 
-`AuthMethod.keyFile` also accepts a `passphrase:` parameter, but it's
-not currently wired to any decryption — every key format Swiftmiko can
-load must be unencrypted; a passphrase-protected key throws a clear
-error regardless of what's passed for `passphrase:`. Strip the
-passphrase first: `ssh-keygen -p -N '' -f <keyfile>`. Supported key
-types are Ed25519 and ECDSA (P-256/384/521) in OpenSSH, SEC1 PEM, or
-PKCS8 PEM format — RSA throws a clear "not supported" error pointing
-at `ssh-keygen -t ed25519` as the suggested conversion.
+`AuthMethod.keyFile` also accepts a `passphrase:` parameter, which
+decrypts an OpenSSH-format private key encrypted with OpenSSH's
+standard `bcrypt`-kdf + AES-CTR/CBC scheme (what `ssh-keygen` produces
+by default when you give it a passphrase):
+
+```swift
+auth: .keyFile(path: "~/.ssh/test_ed25519", passphrase: "correct horse battery staple")
+```
+
+A missing or incorrect passphrase throws a clear error rather than
+silently failing or producing garbage key material. SEC1 and PKCS8 PEM
+keys don't support this parameter at all — OpenSSH format is the only
+passphrase-encrypted format Swiftmiko can load; an encrypted SEC1 or
+PKCS8 key is not a case any caller is expected to hit (`ssh-keygen`
+doesn't produce them that way by default).
+
+Supported key types are Ed25519, ECDSA (P-256/384/521), and RSA
+(`ssh-rsa`, RFC 4253 §6.6) in OpenSSH format; SEC1 and PKCS8 PEM
+support Ed25519/ECDSA only, not RSA. Classic PKCS#1 PEM RSA keys
+(`-----BEGIN RSA PRIVATE KEY-----`, the format `ssh-keygen -m PEM`
+produces) aren't supported — re-save in OpenSSH format first:
+`ssh-keygen -p -f <keyfile>` (no `-m` flag re-saves in the current
+default format).
 
 `AuthMethod.sshAgent` exists as a case but
 is **not currently implemented** — swift-nio-ssh (the transport

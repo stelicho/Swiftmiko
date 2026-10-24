@@ -29,12 +29,13 @@ final class SecureConnectViewModel {
     var authKind: SecureConnectAuthKind = .keyFile
     var password = ""
 
-    /// Supported key formats: Ed25519 and ECDSA (P-256/384/521), in
-    /// OpenSSH, SEC1 PEM, or PKCS8 PEM form — see SSHKeyLoader.swift.
-    /// RSA throws a clear "not supported" error; passphrase-protected
-    /// keys throw regardless of what's passed as `passphrase` below —
-    /// that parameter exists on AuthMethod.keyFile but isn't wired to
-    /// any decryption yet. Strip it first: ssh-keygen -p -N '' -f <key>.
+    /// Supported key formats: Ed25519, ECDSA (P-256/384/521), and RSA
+    /// (ssh-rsa) in OpenSSH form — see SSHKeyLoader.swift. SEC1/PKCS8
+    /// PEM support Ed25519/ECDSA only; RSA in either PEM format throws
+    /// a clear "not supported" error. Passphrase-protected keys are
+    /// supported for the OpenSSH format only (ssh-keygen's default),
+    /// via OpenSSH's standard bcrypt-kdf + AES-CTR/CBC scheme — see
+    /// BCryptPBKDF.swift. SEC1/PKCS8 PEM keys must be unencrypted.
     var keyPath = "~/.ssh/id_ed25519"
     var keyPassphrase = ""
 

@@ -180,13 +180,21 @@ template text from outside the package. `TTPTemplate` now has a public
 
 [`SecureConnectDemo`](./Examples/SecureConnectDemo) combines
 Swiftmiko's two independent "lock this connection down" knobs in one
-place: key-based auth (`AuthMethod.keyFile`) and `known_hosts` host key
+place: key-based auth (`AuthMethod.keyFile`, including
+passphrase-protected and now RSA keys) and `known_hosts` host key
 verification (`strictHostKeyChecking`/`hostKeyPolicy`). Its README
-documents three real findings from building it — `AuthMethod.sshAgent`
-silently did nothing and now throws a clear error instead,
-`AuthMethod.keyFile`'s `passphrase:` parameter was never actually wired
-to any decryption, and host key verification had no documentation in
-`EXAMPLES.md` at all despite being fully implemented.
+documents the real findings from building it — `AuthMethod.sshAgent`
+silently did nothing and now throws a clear error instead, host key
+verification had no documentation in `EXAMPLES.md` at all despite
+being fully implemented, `AuthMethod.keyFile`'s `passphrase:` parameter
+— found to be entirely dead — now actually decrypts OpenSSH-format
+encrypted keys via a from-scratch, upstream-verified `bcrypt_pbkdf`
+port (`Sources/BCryptPBKDF.swift`, `Sources/BlowfishKDFSupport.swift`),
+and RSA client-key signing — previously unsupported entirely, since
+the vendored NIOSSH fork had no RSA private-key case at all — now
+works, verified end-to-end against a real, independent `asyncssh` test
+server since the signing code lives inside the vendored module and
+isn't unit-testable directly from this package.
 
 [`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
 one out — a browser-based sibling of `CommandRunnerDemo` built with

@@ -16,16 +16,25 @@
 //
 //  Supported formats:
 //   • OpenSSH private key  (-----BEGIN OPENSSH PRIVATE KEY-----)
-//     - ssh-ed25519, ecdsa-sha2-nistp256/384/521
-//     - Unencrypted only (encrypted keys produce a clear error)
+//     - ssh-ed25519, ecdsa-sha2-nistp256/384/521, ssh-rsa
+//     - RSA signing (RFC 4253 §6.6, SHA-1 + PKCS1v1.5) required adding
+//       a .rsa case to the vendored NIOSSH fork's NIOSSHPrivateKey —
+//       swift-nio-ssh upstream has no RSA private-key support at all,
+//       only (since an earlier fork addition) RSA host-key
+//       verification. Field order (n, e, d, iqmp, p, q) confirmed
+//       against a real `ssh-keygen -t rsa` key, not assumed.
+//     - Passphrase-protected keys are supported via the standard
+//       OpenSSH bcrypt-kdf + AES-CTR/CBC scheme (see BCryptPBKDF.swift).
+//       Any other KDF/cipher combination produces a clear error.
 //   • SEC1 PEM             (-----BEGIN EC PRIVATE KEY-----)
 //     - ecdsa-sha2-nistp256/384/521
 //   • PKCS8 PEM            (-----BEGIN PRIVATE KEY-----)
-//     - ecdsa-sha2-nistp256/384/521 and Ed25519
+//     - ecdsa-sha2-nistp256/384/521 and Ed25519 — RSA in PKCS8 PEM
+//       form is NOT supported (different DER structure entirely);
+//       re-save as OpenSSH format with `ssh-keygen -p -f <keyfile>`.
 //
-//  RSA is not supported by swift-nio-ssh and is rejected with a clear message.
-//  Encrypted keys (passphrase-protected) are not supported; the caller
-//  receives a message explaining how to strip the passphrase.
+//  Classic PKCS#1 PEM RSA keys (-----BEGIN RSA PRIVATE KEY-----) are
+//  also not supported — same remedy, re-save in OpenSSH format.
 //
 
 import Foundation
@@ -34,6 +43,7 @@ import CryptoKit
 #else
 import Crypto
 #endif
+import CryptoExtras
 import NIOSSH
 import NIOCore
 
@@ -64,8 +74,11 @@ enum SSHKeyLoader {
         if trimmed.hasPrefix("-----BEGIN RSA PRIVATE KEY-----") ||
            trimmed.contains("RSA") {
             throw SwiftmikoError.notImplemented(
-                "RSA private keys are not supported. " +
-                "Convert to Ed25519: ssh-keygen -t ed25519 -f <new_key>"
+                "Classic PKCS#1 PEM-format RSA keys ('-----BEGIN RSA PRIVATE KEY-----') " +
+                "are not supported. RSA keys in OpenSSH format ('-----BEGIN OPENSSH " +
+                "PRIVATE KEY-----', ssh-keygen's current default) are supported — " +
+                "re-save this key in that format with: ssh-keygen -p -f <keyfile> " +
+                "(or convert to Ed25519: ssh-keygen -t ed25519 -f <new_key>)."
             )
         }
         throw SwiftmikoError.authenticationFailed(
@@ -89,14 +102,7 @@ enum SSHKeyLoader {
 
         let ciphername = String(bytes: try buf.readSSHString(), encoding: .utf8) ?? ""
         let kdfname    = String(bytes: try buf.readSSHString(), encoding: .utf8) ?? ""
-        _              = try buf.readSSHString()  // kdfoptions
-
-        if ciphername != "none" || kdfname != "none" {
-            throw SwiftmikoError.authenticationFailed(
-                "Passphrase-protected SSH keys are not supported. " +
-                "Remove the passphrase first: ssh-keygen -p -N '' -f <keyfile>"
-            )
-        }
+        let kdfoptions = try buf.readSSHString()
 
         let numKeys = try buf.readUInt32()
         guard numKeys >= 1 else {
@@ -105,14 +111,34 @@ enum SSHKeyLoader {
 
         _ = try buf.readSSHString()  // public key blob — not needed
 
-        let privateBlob = try buf.readSSHString()
+        var privateBlob = try buf.readSSHString()
+
+        if ciphername != "none" || kdfname != "none" {
+            guard kdfname == "bcrypt" else {
+                throw SwiftmikoError.notImplemented(
+                    "SSH key KDF '\(kdfname)' is not supported — only 'bcrypt' " +
+                    "(OpenSSH's own default for passphrase-protected keys) is."
+                )
+            }
+            guard let passphrase, !passphrase.isEmpty else {
+                throw SwiftmikoError.authenticationFailed(
+                    "This SSH key is passphrase-protected but no passphrase was supplied."
+                )
+            }
+            privateBlob = try decryptOpenSSHPrivateBlob(
+                privateBlob, cipherName: ciphername, kdfOptions: kdfoptions, passphrase: passphrase
+            )
+        }
+
         var priv = SSHBuffer(privateBlob)
 
         let check1 = try priv.readUInt32()
         let check2 = try priv.readUInt32()
         guard check1 == check2 else {
             throw SwiftmikoError.authenticationFailed(
-                "OpenSSH private key checksum mismatch — the key may be corrupted"
+                ciphername != "none"
+                    ? "Failed to decrypt this SSH key — the passphrase is likely incorrect."
+                    : "OpenSSH private key checksum mismatch — the key may be corrupted"
             )
         }
 
@@ -127,11 +153,79 @@ enum SSHKeyLoader {
             return try parseOpenSSHECDSA(&priv, curve: .p384)
         case "ecdsa-sha2-nistp521":
             return try parseOpenSSHECDSA(&priv, curve: .p521)
+        case "ssh-rsa":
+            return try parseOpenSSHRSA(&priv)
         default:
             throw SwiftmikoError.notImplemented(
                 "SSH key type '\(keyType)' is not supported. " +
-                "Supported: ssh-ed25519, ecdsa-sha2-nistp256/384/521"
+                "Supported: ssh-ed25519, ecdsa-sha2-nistp256/384/521, ssh-rsa"
             )
+        }
+    }
+
+    /// OpenSSH's own private-key field order for `ssh-rsa` (confirmed
+    /// against a real `ssh-keygen -t rsa` key, not assumed from the
+    /// public-key format): n, e, d, iqmp, p, q, comment. `iqmp`
+    /// (q⁻¹ mod p) isn't needed here — `_RSA.Signing.PrivateKey`
+    /// derives CRT parameters itself from n/e/d/p/q.
+    private static func parseOpenSSHRSA(_ priv: inout SSHBuffer) throws -> NIOSSHPrivateKey {
+        let n = try priv.readSSHString()
+        let e = try priv.readSSHString()
+        let d = try priv.readSSHString()
+        _ = try priv.readSSHString()  // iqmp — not needed
+        let p = try priv.readSSHString()
+        let q = try priv.readSSHString()
+        do {
+            let key = try _RSA.Signing.PrivateKey(n: n, e: e, d: d, p: p, q: q)
+            return NIOSSHPrivateKey(rsaKey: key)
+        } catch {
+            throw SwiftmikoError.authenticationFailed("Invalid RSA key material: \(error)")
+        }
+    }
+
+    /// Decrypts an OpenSSH-format encrypted private-key blob using the
+    /// standard bcrypt-kdf scheme (RFC-less, but documented in OpenSSH's
+    /// own PROTOCOL.key): `kdfoptions` is itself an SSH-string-encoded
+    /// `(salt, rounds)` pair, and the derived bytes split into a cipher
+    /// key followed by an IV, sized per `cipherName`.
+    private static func decryptOpenSSHPrivateBlob(
+        _ ciphertext: [UInt8], cipherName: String, kdfOptions: [UInt8], passphrase: String
+    ) throws -> [UInt8] {
+        var kdfBuf = SSHBuffer(kdfOptions)
+        let salt = try kdfBuf.readSSHString()
+        let rounds = try kdfBuf.readUInt32()
+
+        let keySize: Int
+        switch cipherName {
+        case "aes128-ctr", "aes128-cbc": keySize = 16
+        case "aes192-ctr", "aes192-cbc": keySize = 24
+        case "aes256-ctr", "aes256-cbc": keySize = 32
+        default:
+            throw SwiftmikoError.notImplemented(
+                "SSH key cipher '\(cipherName)' is not supported for a passphrase-protected key. " +
+                "Supported: aes128/192/256-ctr, aes128/192/256-cbc."
+            )
+        }
+        let ivSize = 16  // AES block size, for both CTR (counter) and CBC (IV)
+
+        let derived = try BCryptPBKDF.derive(
+            password: Array(passphrase.utf8), salt: salt,
+            keyLength: keySize + ivSize, rounds: Int(rounds)
+        )
+        let key = SymmetricKey(data: Array(derived.prefix(keySize)))
+        let iv = Array(derived.suffix(ivSize))
+
+        do {
+            switch cipherName {
+            case "aes128-ctr", "aes192-ctr", "aes256-ctr":
+                let nonce = try AES._CTR.Nonce(nonceBytes: iv)
+                return Array(try AES._CTR.decrypt(ciphertext, using: key, nonce: nonce))
+            default:
+                let ivValue = try AES._CBC.IV(ivBytes: iv)
+                return Array(try AES._CBC.decrypt(ciphertext, using: key, iv: ivValue, noPadding: true))
+            }
+        } catch {
+            throw SwiftmikoError.authenticationFailed("Failed to decrypt SSH key: \(error)")
         }
     }
 
@@ -200,8 +294,10 @@ enum SSHKeyLoader {
         }
         if der.contains(subsequence: rsaOID) {
             throw SwiftmikoError.notImplemented(
-                "RSA private keys are not supported. " +
-                "Convert to Ed25519: ssh-keygen -t ed25519 -f <new_key>"
+                "RSA keys in PKCS8 PEM format are not supported (only OpenSSH " +
+                "format RSA keys are — see SSHKeyLoader.swift). Re-save with " +
+                "ssh-keygen -p -f <keyfile>, or convert to Ed25519: " +
+                "ssh-keygen -t ed25519 -f <new_key>"
             )
         }
         throw SwiftmikoError.authenticationFailed(
