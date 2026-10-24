@@ -147,6 +147,46 @@ minimal real SNMP v1/v2c GET transport written for the demo (the
 library itself only ships the autodetection logic, not a wire client —
 see `SNMPTransport` in `Sources/SNMPAutodetect.swift`) to identify a
 device from its `sysDescr`.
+[`SSHAutodetectDemo`](./Examples/SSHAutodetectDemo) is its SSH-transport
+sibling — `SSHDetect` guessing a device's type from its own banners and
+command output, probing as a neutral `"generic_termserver"` connection
+(no vendor-specific session setup) rather than risking a real driver's
+setup commands confusing an unknown device.
+
+[`FleetDemo`](./Examples/FleetDemo) runs one command against several
+devices at once via `withTaskGroup` rather than one at a time — the
+visible SwiftUI counterpart to what `swiftmiko-show`/`-cfg`/`-grep`
+already do under the hood. Each device's status (pending, running,
+succeeded with output, or failed with an error) updates independently
+as its own connection finishes, not all at once at the end.
+
+[`RedispatchDemo`](./Examples/RedispatchDemo) walks through EXAMPLES.md's
+"terminal server and redispatch" pattern as a runnable sequence: connect
+normally to a first device, telnet from its own CLI to a terminal server
+without reconnecting, then `SSHDispatcher.redispatch()` swaps the active
+driver onto that same channel for whatever's actually attached on the
+other side. Each stage (connect, telnet, redispatch, run command) shows
+its own status and output as it completes.
+
+[`StructuredParsingDemo`](./Examples/StructuredParsingDemo) runs a
+`show version` transcript through both of Swiftmiko's native
+structured-parsing engines — TextFSM (using the real, unmodified
+`cisco_ios_show_version.textfsm` from ntc-templates) and TTP — and shows
+the results side by side. Its README documents a real gap building it
+found and fixed: `COMMON_ISSUES.md`'s own TTP example called a method
+that wasn't actually `public`, so there was no way to parse inline TTP
+template text from outside the package. `TTPTemplate` now has a public
+`parse(rawText:)` method closing that gap.
+
+[`SecureConnectDemo`](./Examples/SecureConnectDemo) combines
+Swiftmiko's two independent "lock this connection down" knobs in one
+place: key-based auth (`AuthMethod.keyFile`) and `known_hosts` host key
+verification (`strictHostKeyChecking`/`hostKeyPolicy`). Its README
+documents three real findings from building it — `AuthMethod.sshAgent`
+silently did nothing and now throws a clear error instead,
+`AuthMethod.keyFile`'s `passphrase:` parameter was never actually wired
+to any decryption, and host key verification had no documentation in
+`EXAMPLES.md` at all despite being fully implemented.
 
 [`CommandRunnerWebDemo`](./Examples/CommandRunnerWebDemo) is the odd
 one out — a browser-based sibling of `CommandRunnerDemo` built with

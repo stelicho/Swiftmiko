@@ -418,8 +418,15 @@ public final class NIOSSHChannel: Swiftmiko.Channel, @unchecked Sendable {
             let nioKey = try SSHKeyLoader.load(path: path, passphrase: passphrase)
             return KeyAuthDelegate(username: profile.username, nioKey: nioKey)
         case .sshAgent:
-            // SSH-agent forwarding is not supported by swift-nio-ssh.
-            return NoAuthDelegate()
+            // swift-nio-ssh has no SSH-agent protocol support to forward to —
+            // this previously fell through to NoAuthDelegate silently, which
+            // just surfaced as a generic, confusing auth-negotiation failure
+            // from NIOSSH itself. Fail loudly and explicitly instead.
+            throw SwiftmikoError.notImplemented(
+                "AuthMethod.sshAgent is not currently implemented — swift-nio-ssh " +
+                "has no SSH-agent protocol support. Use .keyFile(path:passphrase:) " +
+                "to authenticate with a key directly instead."
+            )
         case .none:
             return NoAuthDelegate()
         }

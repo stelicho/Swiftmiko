@@ -35,6 +35,7 @@ this repo for complete, larger programs.
 
 #### SSH keys
 - [SSH keys](#ssh-keys)
+- [Host key verification](#host-key-verification)
 
 #### Logging and Session Log
 - [Session log](#session-log)
@@ -398,7 +399,7 @@ let profile = ConnectionProfile(
     host: "cisco1.lasthop.io",
     deviceType: "cisco_ios",
     username: "testuser",
-    auth: .keyFile(path: "~/.ssh/test_rsa")
+    auth: .keyFile(path: "~/.ssh/test_ed25519")
 )
 
 let connection = try await SSHDispatcher.connectHandler(profile: profile)
@@ -408,13 +409,69 @@ await connection.disconnect()
 print(output)
 ```
 
-`AuthMethod.keyFile` also accepts a `passphrase:` for
-passphrase-protected keys; `AuthMethod.sshAgent` defers to a running
-SSH agent instead. There's currently no `ssh_config_file`-style
-option — Swiftmiko talks to the transport directly rather than
-shelling out to a system SSH client, so jump-host/proxy behavior
-needs to be modeled explicitly on the profile rather than read from
-an OpenSSH config file.
+`AuthMethod.keyFile` also accepts a `passphrase:` parameter, but it's
+not currently wired to any decryption — every key format Swiftmiko can
+load must be unencrypted; a passphrase-protected key throws a clear
+error regardless of what's passed for `passphrase:`. Strip the
+passphrase first: `ssh-keygen -p -N '' -f <keyfile>`. Supported key
+types are Ed25519 and ECDSA (P-256/384/521) in OpenSSH, SEC1 PEM, or
+PKCS8 PEM format — RSA throws a clear "not supported" error pointing
+at `ssh-keygen -t ed25519` as the suggested conversion.
+
+`AuthMethod.sshAgent` exists as a case but
+is **not currently implemented** — swift-nio-ssh (the transport
+Swiftmiko is built on) has no SSH-agent protocol support to forward
+to, so using it throws `SwiftmikoError.notImplemented` rather than
+silently doing nothing. Use `.keyFile` directly instead. There's also
+currently no `ssh_config_file`-style option — Swiftmiko talks to the
+transport directly rather than shelling out to a system SSH client, so
+jump-host/proxy behavior needs to be modeled explicitly on the profile
+rather than read from an OpenSSH config file.
+
+<br />
+
+## Host key verification
+
+`ConnectionProfile.strictHostKeyChecking` defaults to `false` —
+deliberately permissive, since it's common to be connecting against
+lab/freshly-reimaged gear whose host key changes constantly, and
+verifying it against anything in that situation is actively unhelpful.
+In that default state, Swiftmiko accepts any host key unconditionally;
+it does **not** protect against a MITM swapping in its own key.
+
+Set it to `true` to verify every host key against an OpenSSH-format
+`known_hosts` file instead — equivalent to `ssh -o StrictHostKeyChecking=yes`
+(or `accept-new`, depending on `hostKeyPolicy`):
+
+```swift
+let profile = ConnectionProfile(
+    host: "cisco1.lasthop.io",
+    deviceType: "cisco_ios",
+    username: "testuser",
+    auth: .keyFile(path: "~/.ssh/test_ed25519"),
+    strictHostKeyChecking: true,
+    knownHostsPath: "~/.ssh/known_hosts",  // nil defaults to this same path
+    hostKeyPolicy: .rejectUnknown          // or .autoAdd
+)
+
+let connection = try await SSHDispatcher.connectHandler(profile: profile)
+```
+
+`hostKeyPolicy` only matters for a host with **no** existing
+`known_hosts` entry at all:
+
+- `.rejectUnknown` (the secure default once `strictHostKeyChecking` is
+  on) — refuse to connect, same as `ssh -o StrictHostKeyChecking=yes`.
+- `.autoAdd` — trust-on-first-use: accept the key and append it to
+  `known_hosts`, same as `ssh -o StrictHostKeyChecking=accept-new`.
+
+Neither setting changes what happens for a host that **does** already
+have an entry: a presented key that doesn't match any key on file for
+that host is always rejected, regardless of `hostKeyPolicy` — that
+mismatch is exactly the MITM-detection property strict checking exists
+to catch. See `Sources/KnownHosts.swift` for the full implementation,
+including the OpenSSH-format reader/writer (plain and hashed hostname
+entries) and SHA256 fingerprint display used in rejection errors.
 
 <br />
 

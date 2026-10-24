@@ -94,6 +94,20 @@ public final class TTPTemplate {
         self.forceListByPath = forceListByPath
     }
 
+    /// Parses `rawText` against this template, mirroring
+    /// `TextFSMTemplate.parseTextToDicts(_:)`'s shape: one dict per
+    /// record, nested `<group>`s attaching as `[String: Any]` (single
+    /// match) or `[[String: Any]]` (list), omitted entirely from a
+    /// record if that group never matched anything for it.
+    ///
+    /// This is the actual inline-content entry point for TTP —
+    /// `NativeTTPParser` (the `TTPParserAdapter` conformance) only
+    /// accepts a template *file path*, so call this directly when the
+    /// template is already in memory as a string.
+    public func parse(rawText: String) -> [[String: Any]] {
+        TTPExecution.parse(template: self, rawText: rawText)
+    }
+
     private static func extractTagName(_ trimmedLine: String) -> String {
         let withoutBrackets = trimmedLine.trimmingCharacters(in: CharacterSet(charactersIn: "<>/"))
         return withoutBrackets.split(separator: " ").first.map(String.init) ?? withoutBrackets

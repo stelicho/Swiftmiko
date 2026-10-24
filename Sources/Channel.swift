@@ -20,7 +20,18 @@ import Foundation
 /// Authentication methods supported by a Swiftmiko channel.
 public enum AuthMethod: Sendable {
     case password(String)
+
+    /// `passphrase` is accepted here but not currently wired to any
+    /// decryption — every key format `SSHKeyLoader` parses must be
+    /// unencrypted; a passphrase-protected key throws a clear
+    /// "Passphrase-protected SSH keys are not supported" error
+    /// regardless of what (if anything) is passed here. Strip the
+    /// passphrase first: `ssh-keygen -p -N '' -f <keyfile>`.
     case keyFile(path: String, passphrase: String? = nil)
+
+    /// Not currently implemented — swift-nio-ssh has no SSH-agent
+    /// protocol support to forward to. Using this throws
+    /// `SwiftmikoError.notImplemented`; use `.keyFile` instead.
     case sshAgent
     case none
 }

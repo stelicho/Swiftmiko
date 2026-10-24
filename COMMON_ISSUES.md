@@ -192,11 +192,18 @@ or directly:
 
 ```swift
 let template = try TTPTemplate(templateString: try String(contentsOfFile: "interfaces.ttp"))
-let rows = TTPExecution.parse(template: template, rawText: rawShowRunOutput)
+let rows = template.parse(rawText: rawShowRunOutput)
 // rows: [[String: Any]] — nested <group>s attach as [String: Any] (single
 // match, no trailing "*") or [[String: Any]] (list), omitted entirely
 // from a record if that group never matched anything for it.
 ```
+
+(Until recently this example called `TTPExecution.parse(template:rawText:)`
+directly — that type was never `public`, so the snippet silently didn't
+compile for anyone outside the package. `TTPTemplate.parse(rawText:)` is
+the real public entry point for inline template content; `NativeTTPParser`
+is for when the template lives in its own file on disk and only accepts a
+path, not inline text.)
 
 **Genie** has no generic engine to port in the first place — every
 pyATS/Genie parser is its own hand-written Python class with bespoke
