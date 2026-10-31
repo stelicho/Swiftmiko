@@ -46,6 +46,7 @@ open class CiscoBaseConnection: BaseConnection {
     ) async throws -> String {
         if checkState, try await isInEnableMode() { return "" }
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(command + profile.returnCharacter)
         var output = try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
 
@@ -59,6 +60,7 @@ open class CiscoBaseConnection: BaseConnection {
                     "Enable password required for \(profile.host), but no secret was provided"
                 )
             }
+            logger.debug("Enable-mode password prompt detected, sending secret")
             try await writeChannel(secretToSend + profile.returnCharacter)
             output += try await readUntilPromptOrPattern(
                 pattern: enablePattern ?? promptPattern, timeout: profile.readTimeout
@@ -73,7 +75,8 @@ open class CiscoBaseConnection: BaseConnection {
 
     @discardableResult
     override open func exitEnableMode(exitCommand: String = "disable") async throws -> String {
-        try await sendCommand(exitCommand, stripPrompt: false, stripCommand: false)
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
+        return try await sendCommand(exitCommand, stripPrompt: false, stripCommand: false)
     }
 
     // MARK: - Configuration mode
@@ -200,7 +203,8 @@ open class CiscoBaseConnection: BaseConnection {
         cmdVerify: Bool = true,
         pattern: String? = nil
     ) async throws -> String {
-        try await sendCommand(command, stripPrompt: false, stripCommand: false)
+        logger.debug("Disabling paging via '\(command)'")
+        return try await sendCommand(command, stripPrompt: false, stripCommand: false)
     }
 
     open func setTerminalWidth(command: String, pattern: String) async throws {

@@ -228,6 +228,7 @@ public final class CheckPointGaiaSSH: BaseConnection, NoConfig {
         // the device-specific secret-sending step.
         if checkState, try await isInEnableMode() { return "" }
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(normalizeCommand(command))
         var output = try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
         output = try await enableSecretHandler(
@@ -264,6 +265,7 @@ public final class CheckPointGaiaSSH: BaseConnection, NoConfig {
         var output = ""
         guard try await isInEnableMode() else { return output }
 
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
         try await writeChannel(normalizeCommand(exitCommand))
         output += try await readUntilPattern(pattern: ">")
         try await setBasePrompt()

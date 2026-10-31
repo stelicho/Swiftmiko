@@ -1004,6 +1004,7 @@ open class BaseConnection: DeviceDriver {
     ) async throws -> String {
         if checkState, try await isInEnableMode() { return "" }
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(command + effectiveReturnCharacter)
         var output = try await readUntilPromptOrPattern(pattern: pattern, timeout: profile.readTimeout)
 
@@ -1017,6 +1018,9 @@ open class BaseConnection: DeviceDriver {
                     "Enable password required for \(profile.host), but no secret was provided"
                 )
             }
+            // Deliberately not logging the secret itself — only that a
+            // password prompt was seen and answered.
+            logger.debug("Enable-mode password prompt detected, sending secret")
             try await writeChannel(secretToSend + effectiveReturnCharacter)
             output += try await readUntilPromptOrPattern(
                 pattern: enablePattern ?? promptPattern, timeout: profile.readTimeout
@@ -1035,7 +1039,8 @@ open class BaseConnection: DeviceDriver {
     /// to exist independently of that class.
     @discardableResult
     public func genericExitEnableMode(exitCommand: String) async throws -> String {
-        try await sendCommand(exitCommand, stripPrompt: false, stripCommand: false)
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
+        return try await sendCommand(exitCommand, stripPrompt: false, stripCommand: false)
     }
 
     /// Shared generic "send the command, enter config mode
@@ -1097,7 +1102,8 @@ open class BaseConnection: DeviceDriver {
     /// independently of that class.
     @discardableResult
     public func genericDisablePaging(command: String) async throws -> String {
-        try await sendCommand(command, stripPrompt: false, stripCommand: false)
+        logger.debug("Disabling paging via '\(command)'")
+        return try await sendCommand(command, stripPrompt: false, stripCommand: false)
     }
 
     // MARK: Delay scaling

@@ -46,6 +46,7 @@ open class OptilinkGOLT924Base: CiscoBaseConnection {
         var output = ""
         guard try await isInEnableMode() else { return output }
 
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
         try await writeChannel(normalizeCommand(exitCommand))
         _ = try await readUntilPattern(pattern: exitCommand)
         output += try await readUntilPattern(pattern: "gpon>")

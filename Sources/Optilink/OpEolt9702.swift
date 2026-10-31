@@ -85,6 +85,7 @@ open class OptilinkEOLT9702Base: CiscoBaseConnection {
         var output = ""
         guard try await isInEnableMode() else { return output }
 
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
         try await writeChannel(normalizeCommand(exitCommand))
         _ = try await readUntilPattern(pattern: exitCommand)
         output += try await readUntilPattern(pattern: "OP_OLT>")

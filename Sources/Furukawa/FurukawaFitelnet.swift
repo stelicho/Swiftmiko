@@ -138,6 +138,7 @@ open class FurukawaFitelnetBase: CiscoBaseConnection {
             return output
         }
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(normalizeCommand(command))
         output += try await readUntilPattern(
             pattern: "(?:\(pattern)|#)",
@@ -185,6 +186,7 @@ open class FurukawaFitelnetBase: CiscoBaseConnection {
         var output = ""
         guard try await isInEnableMode() else { return output }
 
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
         try await writeChannel(normalizeCommand(exitCommand))
         output += try await readUntilPattern(pattern: #">\s*$"#)
 

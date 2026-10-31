@@ -157,6 +157,7 @@ public final class DellIsilonSSH: BaseConnection {
             return output
         }
 
+        logger.debug("Entering enable mode via '\(command)'")
         output += try await sendCommandTiming(
             command,
             stripPrompt: false,
@@ -197,6 +198,7 @@ public final class DellIsilonSSH: BaseConnection {
     ) async throws -> String {
         guard try await isInEnableMode() else { return "" }
 
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
         let delay = selectDelayFactor(1.0)
         try await writeChannel(normalizeCommand(exitCommand))
         let output = try await readUntilPattern(pattern: #"\$.*$"#)

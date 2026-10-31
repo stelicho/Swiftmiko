@@ -61,6 +61,7 @@ public final class NetscalerSSH: BaseConnection, NoConfig {
         let trimmedCommand = command.replacingOccurrences(
             of: #"\s+$"#, with: "", options: .regularExpression
         )
+        logger.debug("Disabling paging via '\(trimmedCommand)'")
         return try await sendCommand(trimmedCommand, stripPrompt: false, stripCommand: false)
     }
 

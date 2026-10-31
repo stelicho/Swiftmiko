@@ -95,6 +95,7 @@ open class AdtranOSBase: CiscoBaseConnection {
             return output
         }
 
+        logger.debug("Entering enable mode via '\(command)'")
         do {
             try await writeChannel(normalizeCommand(command))
 

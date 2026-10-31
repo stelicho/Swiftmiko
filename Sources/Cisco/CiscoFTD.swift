@@ -119,6 +119,7 @@ public final class CiscoFtdSSH: CiscoSSHConnection, NoConfig {
         // Already in enable mode — nothing to do
         guard try await !isInEnableMode() else { return "" }
 
+        logger.debug("Entering enable mode via diagnostic CLI subprocess")
         // Phase 1: Enter the diagnostic CLI subprocess
         let diagCmd = "system support diagnostic-cli"
         try await writeChannel(normalizeCommand(diagCmd))
@@ -201,6 +202,7 @@ public final class CiscoFtdSSH: CiscoSSHConnection, NoConfig {
         // \x01 = Ctrl+A, "d" = detach
         // This is a raw terminal control sequence, not a CLI command.
         // cmd_verify must be False — there is no echo to wait for.
+        logger.debug("Exiting enable mode (detaching from diagnostic CLI)")
         let detachSequence = "\u{01}d"  // \x01d in Python
         output += try await sendCommandTiming(
             detachSequence,

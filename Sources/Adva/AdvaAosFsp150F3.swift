@@ -192,6 +192,7 @@ public final class AdvaAosFsp150F3SSH: CiscoSSHConnection, NoEnable, NoConfig {
             "config-user \(profile.username) cli-paging disabled",
             "home"
         ]
+        logger.debug("Disabling paging via per-user cli-paging config")
         return try await sendConfigSet(commands, cmdVerify: cmdVerify)
     }
 

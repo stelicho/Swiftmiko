@@ -185,6 +185,7 @@ open class HPProcurveBase: CiscoSSHConnection {
         let promptPattern = "[>#]"
         var fullPattern = "(username|login|user name|\(passwordPattern)|\(promptPattern))"
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(command + profile.returnCharacter)
         var newOutput = try await readUntilPattern(
             pattern: fullPattern,

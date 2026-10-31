@@ -63,6 +63,7 @@ open class AviatWTMSSH: CiscoSSHConnection, NoEnable {
         cmdVerify: Bool = true,
         pattern: String? = nil
     ) async throws -> String {
+        logger.debug("Disabling paging via '\(command)'")
         return try await sendConfigSet([command])
     }
 

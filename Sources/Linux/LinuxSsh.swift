@@ -243,6 +243,7 @@ open class LinuxSSHConnection: CiscoSSHConnection {
         var output = ""
         guard try await isInEnableMode() else { return output }
 
+        logger.debug("Exiting enable mode via '\(exitCommand)'")
         try await writeChannel(normalizeCommand(exitCommand))
         output += try await readUntilPattern(pattern: exitCommand)
         output += try await readUntilPattern(pattern: promptPattern)
@@ -302,6 +303,7 @@ open class LinuxSSHConnection: CiscoSSHConnection {
             return output
         }
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(normalizeCommand(command))
 
         // Failed "sudo -s" can put "#" in output, so the real root

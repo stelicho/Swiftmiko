@@ -187,6 +187,7 @@ public final class ZpeNodegridSSH: LinuxSSHConnection, NoEnable, NoConfig {
         cmdVerify: Bool = true,
         pattern: String? = nil
     ) async throws -> String {
+        logger.debug("Disabling paging via '\(command)'")
         return try await sendCommand(
             command,
             expectString: pattern ?? promptPattern

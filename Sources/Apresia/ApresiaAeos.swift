@@ -72,6 +72,7 @@ open class ApresiaAeosBase: CiscoSSHConnection {
         cmdVerify: Bool = true,
         pattern: String? = nil
     ) async throws -> String {
+        logger.debug("Disabling paging via '\(command)' (checked against running-config)")
         try await enterEnableMode(secret: profile.secret ?? "")
 
         let checkCommand = "show running-config | include \(command)"

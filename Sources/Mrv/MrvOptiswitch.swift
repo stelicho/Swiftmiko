@@ -69,6 +69,7 @@ public final class MrvOptiswitchSSH: CiscoSSHConnection {
             return output
         }
 
+        logger.debug("Entering enable mode via '\(command)'")
         try await writeChannel(normalizeCommand(command))
         output += try await readUntilPromptOrPattern(
             pattern: pattern,

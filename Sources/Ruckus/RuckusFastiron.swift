@@ -53,6 +53,7 @@ open class RuckusFastironBase: CiscoSSHConnection {
         }
 
         var output = ""
+        logger.debug("Entering enable mode via '\(command)'")
         for _ in 1..<4 {
             try await writeChannel(command + profile.returnCharacter)
             var newData = try await readUntilPromptOrPattern(

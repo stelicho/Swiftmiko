@@ -93,6 +93,7 @@ open class TPLinkJetStreamBase: CiscoSSHConnection {
         }
 
         var output = ""
+        logger.debug("Entering enable mode, trying 'enable' then 'enable-admin'")
         for cmd in ["enable", "enable-admin"] {
             try await writeChannel(cmd + profile.returnCharacter)
             let newData = try await readUntilPromptOrPattern(

@@ -165,7 +165,8 @@ open class PaloAltoPanosBase: BaseConnection, NoEnable {
         cmdVerify: Bool = true,
         pattern: String? = nil
     ) async throws -> String {
-        try await sendCommand(
+        logger.debug("Disabling paging via '\(command)'")
+        return try await sendCommand(
             command,
             expectString: pattern,
             stripPrompt: false,
