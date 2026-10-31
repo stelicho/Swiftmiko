@@ -252,6 +252,7 @@ open class JuniperBase: BaseConnection, NoEnable {
         var output = ""
         guard try await isInConfigMode() else { return output }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         let confirmMessage = "Exit with uncommitted changes"
         let expectPattern = "(?:>|\(confirmMessage))"
 

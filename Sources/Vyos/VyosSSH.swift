@@ -64,6 +64,7 @@ open class VyOSSSH: CiscoSSHConnection {
     ) async throws -> String {
         guard try await isInConfigMode() else { return "" }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         var output = try await sendCommand(
             exitConfig,
             expectString: "(?:Cannot exit: configuration modified|#)",

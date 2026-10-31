@@ -79,6 +79,7 @@ open class AlaxalaAx36sBase: CiscoSSHConnection {
         var output = ""
         guard try await isInConfigMode() else { return output }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         try await writeChannel(normalizeCommand(exitConfig))
         try await Task.sleep(nanoseconds: 1_000_000_000)
         output = try await readChannel()

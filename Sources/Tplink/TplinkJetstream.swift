@@ -140,6 +140,7 @@ open class TPLinkJetStreamBase: CiscoSSHConnection {
         pattern: String = "#"
     ) async throws -> String {
         var output = ""
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         for _ in 0..<12 {
             guard try await isInConfigMode() else { break }
             try await writeChannel(exitConfig + profile.returnCharacter)

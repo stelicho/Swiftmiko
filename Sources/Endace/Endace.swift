@@ -93,6 +93,7 @@ public final class EndaceSSH: CiscoSSHConnection {
         var output = ""
         guard try await !isInConfigMode() else { return output }
 
+        logger.debug("Entering config mode via '\(command)'")
         output += try await sendCommandTiming(
             command,
             stripPrompt: false,

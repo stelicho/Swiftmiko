@@ -266,6 +266,7 @@ open class TeldatCITBase: BaseConnection, NoEnable {
         exitConfig: String = "",
         pattern: String = ""
     ) async throws -> String {
+        logger.debug("Exiting config mode via base mode")
         return try await baseMode()
     }
 

@@ -167,6 +167,7 @@ public final class FlexvnfSSH: BaseConnection, NoEnable {
         var output = ""
         guard try await isInConfigMode() else { return output }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         output += try await sendCommandTiming(
             exitConfig,
             stripPrompt: false,

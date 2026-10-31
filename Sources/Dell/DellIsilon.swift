@@ -231,6 +231,7 @@ public final class DellIsilonSSH: BaseConnection {
         pattern: String = "ssword",
         dotAll: Bool = false
     ) async throws -> String {
+        logger.debug("Entering config mode via enable mode ('\(command)') — Isilon forwards to enterEnableMode()")
         return try await enterEnableMode(
             secret: profile.secret ?? "",
             command: command,
@@ -245,6 +246,7 @@ public final class DellIsilonSSH: BaseConnection {
         exitConfig: String = "exit",
         pattern: String = ""
     ) async throws -> String {
+        logger.debug("Exiting config mode via enable mode ('\(exitConfig)') — Isilon forwards to exitEnableMode()")
         return try await exitEnableMode(exitCommand: exitConfig)
     }
 }

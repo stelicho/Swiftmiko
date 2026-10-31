@@ -174,6 +174,7 @@ open class NecIxBase: BaseConnection {
 
         dotAll: Bool = false
     ) async throws -> String {
+        logger.debug("Entering config mode via enable mode — NEC IX aliases the two")
         return try await enterEnableMode(secret: profile.secret ?? "")
     }
 
@@ -193,6 +194,7 @@ open class NecIxBase: BaseConnection {
         exitConfig: String = "exit",
         pattern: String = ""
     ) async throws -> String {
+        logger.debug("Exiting config mode via enable mode — NEC IX aliases the two")
         return try await exitEnableMode()
     }
 

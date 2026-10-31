@@ -789,6 +789,7 @@ open class BaseConnection: DeviceDriver {
         guard supportsConfigMode else {
             throw SwiftmikoError.configModeNotSupported
         }
+        logger.debug("Entering config mode (generic default, no device interaction)")
         inConfigMode = true
         return ""
     }
@@ -798,6 +799,7 @@ open class BaseConnection: DeviceDriver {
         exitConfig: String = "exit",
         pattern: String = ""
     ) async throws -> String {
+        logger.debug("Exiting config mode (generic default, no device interaction)")
         inConfigMode = false
         return ""
     }
@@ -1047,6 +1049,7 @@ open class BaseConnection: DeviceDriver {
         pattern: String,
         dotAll: Bool = false
     ) async throws -> String {
+        logger.debug("Entering config mode via '\(command)'")
         try await writeChannel(command + effectiveReturnCharacter)
         inConfigMode = true
         if pattern.isEmpty {
@@ -1066,6 +1069,7 @@ open class BaseConnection: DeviceDriver {
         pattern: String
     ) async throws -> String {
         guard try await isInConfigMode() else { return "" }
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         try await writeChannel(exitConfig + effectiveReturnCharacter)
         let output = pattern.isEmpty
             ? try await readUntilPrompt(timeout: profile.readTimeout)

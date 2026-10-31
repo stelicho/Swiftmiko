@@ -63,6 +63,7 @@ open class AvaraAosSSH: CiscoSSHConnection {
         pattern: String = "",
         dotAll: Bool = false
     ) async throws -> String {
+        logger.debug("Entering config mode via enable mode ('\(command)') — Avara treats the two as the same")
         return try await enterEnableMode(secret: profile.secret ?? "", command: command)
     }
 

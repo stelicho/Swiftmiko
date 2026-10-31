@@ -241,6 +241,7 @@ open class AudiocodeBase: BaseConnection {
 
         guard try await isInConfigMode() else { return output }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         for _ in 0..<maxExitDepth {
             try await writeChannel(normalizeCommand(exitConfig))
 

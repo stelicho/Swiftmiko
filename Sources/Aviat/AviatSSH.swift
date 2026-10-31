@@ -83,6 +83,7 @@ open class AviatWTMSSH: CiscoSSHConnection, NoEnable {
         var output = ""
         guard try await isInConfigMode() else { return output }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         try await writeChannel(normalizeCommand(exitConfig))
         if cmdVerifyEnabled {
             _ = try await readUntilPattern(

@@ -129,6 +129,7 @@ public final class MellanoxMlnxosSSH: CiscoSSHConnection {
         var output = ""
         var checkCount = 12
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         while checkCount >= 0 {
             guard try await isInConfigMode() else { break }
             try await writeChannel(normalizeCommand(exitConfig))

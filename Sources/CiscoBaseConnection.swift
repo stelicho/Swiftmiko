@@ -84,6 +84,7 @@ open class CiscoBaseConnection: BaseConnection {
         pattern: String = "",
         dotAll: Bool = false
     ) async throws -> String {
+        logger.debug("Entering config mode via '\(command)'")
         try await writeChannel(command + profile.returnCharacter)
         inConfigMode = true
         if pattern.isEmpty {
@@ -98,6 +99,7 @@ open class CiscoBaseConnection: BaseConnection {
         pattern: String = #"#.*"#
     ) async throws -> String {
         guard try await isInConfigMode() else { return "" }
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         try await writeChannel(exitConfig + profile.returnCharacter)
         let output = pattern.isEmpty
             ? try await readUntilPrompt(timeout: profile.readTimeout)

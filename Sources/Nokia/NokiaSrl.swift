@@ -229,6 +229,7 @@ public final class NokiaSrlSSH: BaseConnection, NoEnable {
         pattern: String = ""
     ) async throws -> String {
         var output = ""
+        logger.debug("Exiting config mode")
         try await writeChannel(profile.returnCharacter)
         let prompt = try await readUntilPattern(pattern: "#")
 

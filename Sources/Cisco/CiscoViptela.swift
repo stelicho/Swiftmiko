@@ -122,6 +122,7 @@ public final class CiscoViptelaSSH: CiscoSSHConnection {
     ) async throws -> String {
         guard try await isInConfigMode() else { return "" }
 
+        logger.debug("Exiting config mode via '\(exitConfig)'")
         try await writeChannel(normalizeCommand(exitConfig))
 
         // Wait for command echo to avoid getting out of sync with the

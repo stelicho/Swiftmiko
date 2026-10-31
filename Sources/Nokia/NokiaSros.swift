@@ -295,6 +295,7 @@ open class NokiaSros: BaseConnection {
         exitConfig: String = "",
         pattern: String = ""
     ) async throws -> String {
+        logger.debug("Exiting config mode via exitAll()")
         var output = try await exitAll()
 
         if basePrompt.contains("@"), output.contains("(ex)[") {

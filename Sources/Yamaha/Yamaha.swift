@@ -165,6 +165,7 @@ open class YamahaBase: BaseConnection {
         pattern: String = "Password",
         dotAll: Bool = false
     ) async throws -> String {
+        logger.debug("Entering config mode via enable mode ('\(command)') — Yamaha treats the two as the same")
         return try await enterEnableMode(
             secret: profile.secret ?? "",
             command: command,
