@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Fujitsu/FujitsuSir.swift
+// Sources/Fujitsu/FujitsuSir.swift
 
 import Foundation
 

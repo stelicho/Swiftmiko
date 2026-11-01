@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Coriant/CoriantSSH.swift
+// Sources/Coriant/CoriantSSH.swift
 
 import Foundation
 

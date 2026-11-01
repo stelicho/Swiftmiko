@@ -8,6 +8,6 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/Entrypoints/BulkEncrypt/main.swift
+// Sources/CLITools/Entrypoints/BulkEncrypt/main.swift
 import SwiftmikoCLI
 SwiftmikoBulkEncrypt.main()

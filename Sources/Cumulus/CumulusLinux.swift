@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Cumulus/CumulusLinux.swift
+// Sources/Cumulus/CumulusLinux.swift
 
 import Foundation
 

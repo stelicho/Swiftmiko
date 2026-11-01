@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/TelcoSystems/TelcoSystemsBinos.swift
+// Sources/TelcoSystems/TelcoSystemsBinos.swift
 
 import Foundation
 

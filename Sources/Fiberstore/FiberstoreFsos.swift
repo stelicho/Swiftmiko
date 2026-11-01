@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Fiberstore/FiberstoreFsos.swift
+// Sources/Fiberstore/FiberstoreFsos.swift
 
 import Foundation
 

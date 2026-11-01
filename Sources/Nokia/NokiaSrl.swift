@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Nokia/NokiaSrl.swift
+// Sources/Nokia/NokiaSrl.swift
 
 import Foundation
 

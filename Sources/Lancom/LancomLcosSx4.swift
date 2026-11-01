@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Lancom/LancomLcosSx4.swift
+// Sources/Lancom/LancomLcosSx4.swift
 
 import Foundation
 

@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/Outputters.swift
+// Sources/CLITools/Outputters.swift
 //
 // Port of netmiko/cli_tools/outputters.py.
 //

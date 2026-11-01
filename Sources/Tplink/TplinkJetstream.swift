@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Tplink/TplinkJetstream.swift
+// Sources/Tplink/TplinkJetstream.swift
 
 import Foundation
 

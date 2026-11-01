@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/SwiftmikoGrep.swift
+// Sources/CLITools/SwiftmikoGrep.swift
 //
 // Port of netmiko_grep.py.
 

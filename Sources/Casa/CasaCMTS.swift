@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Casa/CasaCMTS.swift
+// Sources/Casa/CasaCMTS.swift
 
 import Foundation
 

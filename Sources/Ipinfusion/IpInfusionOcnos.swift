@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/IpInfusion/IpInfusionOcnos.swift
+// Sources/IpInfusion/IpInfusionOcnos.swift
 
 import Foundation
 

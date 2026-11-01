@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Alaxala/AlaxalaAx36s.swift
+// Sources/Alaxala/AlaxalaAx36s.swift
 
 import Foundation
 

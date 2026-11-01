@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/SwiftmikoCfg.swift
+// Sources/CLITools/SwiftmikoCfg.swift
 //
 // Port of netmiko_cfg.py.
 

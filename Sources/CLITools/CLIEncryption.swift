@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/CLIEncryption.swift
+// Sources/CLITools/CLIEncryption.swift
 //
 // Wire-compatible port of netmiko/encryption_handling.py: both
 // get_encryption_key() and the PBKDF2-HMAC-SHA256 (100k rounds,

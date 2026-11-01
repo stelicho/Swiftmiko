@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Mrv/MrvLx.swift
+// Sources/Mrv/MrvLx.swift
 
 import Foundation
 

@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Flexvnf/Flexvnf.swift
+// Sources/Flexvnf/Flexvnf.swift
 
 import Foundation
 

@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Yamaha/Yamaha.swift
+// Sources/Yamaha/Yamaha.swift
 
 import Foundation
 

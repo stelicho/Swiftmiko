@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/SSHConn.swift
+// Sources/CLITools/SSHConn.swift
 //
 // Port of helpers.py's ssh_conn() plus the ThreadPoolExecutor
 // concurrency used by netmiko_show.py/netmiko_cfg.py/netmiko_grep.py.

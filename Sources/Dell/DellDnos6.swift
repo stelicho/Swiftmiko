@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Dell/DellDnos6.swift
+// Sources/Dell/DellDnos6.swift
 
 import Foundation
 

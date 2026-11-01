@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/SwiftmikoEncrypt.swift
+// Sources/CLITools/SwiftmikoEncrypt.swift
 //
 // Port of netmiko_encrypt.py.
 

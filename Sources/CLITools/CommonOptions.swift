@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/CommonOptions.swift
+// Sources/CLITools/CommonOptions.swift
 //
 // Port of netmiko/cli_tools/argument_handling.py's common_args() and
 // the shared parsing/validation logic in parse_arguments().

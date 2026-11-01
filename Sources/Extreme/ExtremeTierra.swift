@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Extreme/ExtremeTierra.swift
+// Sources/Extreme/ExtremeTierra.swift
 
 import Foundation
 

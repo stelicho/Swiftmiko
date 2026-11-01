@@ -8,6 +8,6 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/Entrypoints/Grep/main.swift
+// Sources/CLITools/Entrypoints/Grep/main.swift
 import SwiftmikoCLI
 await SwiftmikoGrep.runAsMain()

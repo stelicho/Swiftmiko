@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/A10/A10.swift
+// Sources/A10/A10.swift
 
 import Foundation
 

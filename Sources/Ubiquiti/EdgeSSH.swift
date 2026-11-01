@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Ubiquiti/EdgeSSH.swift
+// Sources/Ubiquiti/EdgeSSH.swift
 
 import Foundation
 

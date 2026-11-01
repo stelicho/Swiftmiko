@@ -8,6 +8,6 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/Entrypoints/Cfg/main.swift
+// Sources/CLITools/Entrypoints/Cfg/main.swift
 import SwiftmikoCLI
 await SwiftmikoCfg.runAsMain()

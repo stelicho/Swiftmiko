@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Endace/Endace.swift
+// Sources/Endace/Endace.swift
 
 import Foundation
 

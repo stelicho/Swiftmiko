@@ -8,6 +8,6 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/Entrypoints/Encrypt/main.swift
+// Sources/CLITools/Entrypoints/Encrypt/main.swift
 import SwiftmikoCLI
 SwiftmikoEncrypt.main()

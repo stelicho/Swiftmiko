@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Netgear/NetgearProsafe.swift
+// Sources/Netgear/NetgearProsafe.swift
 
 import Foundation
 

@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Genexis/GenexisSolt33.swift
+// Sources/Genexis/GenexisSolt33.swift
 
 import Foundation
 

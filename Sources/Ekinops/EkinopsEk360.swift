@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Ekinops/EkinopsEk360.swift
+// Sources/Ekinops/EkinopsEk360.swift
 
 import Foundation
 

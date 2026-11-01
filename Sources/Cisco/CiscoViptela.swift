@@ -14,7 +14,7 @@
 //
 //  Created by KK Campbell on 9/3/26.
 //
-// Sources/Swiftmiko/Cisco/CiscoViptela.swift
+// Sources/Cisco/CiscoViptela.swift
 
 import Foundation
 import Logging

@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Calix/CalixB6.swift
+// Sources/Calix/CalixB6.swift
 
 import Foundation
 

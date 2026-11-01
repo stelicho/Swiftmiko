@@ -14,7 +14,7 @@
 //
 //  Created by KK Campbell on 9/3/26.
 //
-// Sources/Swiftmiko/Cisco/CiscoFTD.swift
+// Sources/Cisco/CiscoFTD.swift
 
 import Foundation
 import Logging

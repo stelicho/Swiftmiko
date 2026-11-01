@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Keymile/KeymileNos.swift
+// Sources/Keymile/KeymileNos.swift
 
 import Foundation
 

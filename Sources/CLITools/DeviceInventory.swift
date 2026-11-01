@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/SwiftmikoCLI/DeviceInventory.swift
+// Sources/CLITools/DeviceInventory.swift
 //
 // Port of helpers.py's obtain_devices()/update_device_params() plus
 // the .swiftmiko.yml loading netmiko.utilities.load_netmiko_yml()

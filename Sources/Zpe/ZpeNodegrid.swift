@@ -8,7 +8,7 @@
 //  Created with the assistance of Claude Sonnet 5 (Anthropic),
 //  via Claude Code.
 //
-// Sources/Swiftmiko/Zpe/ZpeNodegrid.swift
+// Sources/Zpe/ZpeNodegrid.swift
 
 import Foundation
 
